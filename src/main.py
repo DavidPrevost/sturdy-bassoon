@@ -13,8 +13,11 @@ from src.utils.config import Config
 from src.utils.api_cache import APICache
 from src.display.driver import DisplayDriver
 from src.display.renderer import Renderer
+from src.display.screen_manager import ScreenManager, Screen
+from src.touch.handler import TouchHandler, Gesture
 from src.widgets.clock import ClockWidget
 from src.widgets.weather import WeatherWidget
+from src.widgets.portfolio import PortfolioWidget
 
 
 class Dashboard:
@@ -36,9 +39,27 @@ class Dashboard:
         self.display = DisplayDriver(width, height)
         self.renderer = Renderer(width, height)
 
-        # Load widgets
-        self.widgets = self._load_widgets()
-        print(f"Loaded {len(self.widgets)} widgets: {[w.get_name() for w in self.widgets]}")
+        # Initialize touch handler
+        self.touch_enabled = self.config.get('touch.enabled', False)
+        self.touch_handler = None
+        if self.touch_enabled:
+            self.touch_handler = TouchHandler(width, height)
+            self.touch_handler.set_gesture_callback(self._on_touch_gesture)
+            print("Touch input enabled")
+
+        # Determine display mode
+        self.multi_screen_mode = self.config.get('display.multi_screen_mode', True)
+
+        if self.multi_screen_mode:
+            # Load screens with widgets
+            self.screen_manager = self._create_screens()
+            print(f"Multi-screen mode: {len(self.screen_manager.screens)} screens")
+            self.widgets = None
+        else:
+            # Legacy single-screen mode
+            self.widgets = self._load_widgets()
+            print(f"Single-screen mode: {len(self.widgets)} widgets")
+            self.screen_manager = None
 
         # Refresh settings
         self.refresh_interval = self.config.get_refresh_interval()
@@ -56,6 +77,7 @@ class Dashboard:
         widget_classes = {
             'clock': ClockWidget,
             'weather': WeatherWidget,
+            'portfolio': PortfolioWidget,
         }
 
         for widget_name in enabled:
@@ -69,46 +91,105 @@ class Dashboard:
 
         return widgets
 
+    def _create_screens(self):
+        """Create screens for multi-screen mode."""
+        screen_manager = ScreenManager()
+
+        # Get screen configurations
+        screen_configs = self.config.get('screens', [])
+
+        if not screen_configs:
+            # Default: create one screen per widget type
+            enabled_widgets = self.config.get_enabled_widgets()
+            screen_configs = [{'name': widget, 'widgets': [widget]} for widget in enabled_widgets]
+
+        # Widget registry
+        widget_classes = {
+            'clock': ClockWidget,
+            'weather': WeatherWidget,
+            'portfolio': PortfolioWidget,
+        }
+
+        for screen_config in screen_configs:
+            screen_name = screen_config.get('name', 'Unnamed')
+            widget_names = screen_config.get('widgets', [])
+
+            # Create widgets for this screen
+            widgets = []
+            for widget_name in widget_names:
+                if widget_name in widget_classes:
+                    widget_class = widget_classes[widget_name]
+                    widget = widget_class(self.config, self.cache)
+                    widgets.append(widget)
+                else:
+                    print(f"  ✗ Unknown widget: {widget_name}")
+
+            if widgets:
+                screen = Screen(screen_name, widgets)
+                screen_manager.add_screen(screen)
+                print(f"  ✓ Created screen '{screen_name}' with {len(widgets)} widgets")
+
+        return screen_manager
+
+    def _on_touch_gesture(self, event):
+        """Handle touch gesture events."""
+        print(f"Touch gesture: {event.gesture.value}")
+
+        if self.multi_screen_mode and self.screen_manager:
+            # Let screen manager handle navigation
+            if self.screen_manager.handle_gesture(event):
+                # Screen changed, render immediately
+                self.render_dashboard(partial=True)
+
     def update_widgets(self):
         """Update data for all widgets."""
         print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Updating widgets...")
-        for widget in self.widgets:
-            try:
-                widget.update_data()
-            except Exception as e:
-                print(f"Error updating {widget.get_name()}: {e}")
+
+        if self.multi_screen_mode and self.screen_manager:
+            # Update current screen only
+            self.screen_manager.update_current_screen()
+        else:
+            # Update all widgets in single-screen mode
+            for widget in self.widgets:
+                try:
+                    widget.update_data()
+                except Exception as e:
+                    print(f"Error updating {widget.get_name()}: {e}")
 
     def render_dashboard(self, partial=False):
-        """Render all widgets to the display."""
+        """Render dashboard to the display."""
         print("Rendering dashboard...")
 
         # Create fresh canvas
         self.renderer.create_canvas()
 
-        # Calculate widget layout
-        # For now: split vertically among widgets
-        num_widgets = len(self.widgets)
-        if num_widgets == 0:
-            print("No widgets to render")
-            return
+        if self.multi_screen_mode and self.screen_manager:
+            # Render current screen
+            self.screen_manager.render(self.renderer)
+        else:
+            # Single-screen mode: render all widgets
+            num_widgets = len(self.widgets)
+            if num_widgets == 0:
+                print("No widgets to render")
+                return
 
-        widget_height = self.renderer.height // num_widgets
+            widget_height = self.renderer.height // num_widgets
 
-        # Render each widget
-        for i, widget in enumerate(self.widgets):
-            y = i * widget_height
-            bounds = (0, y, self.renderer.width, widget_height)
+            # Render each widget
+            for i, widget in enumerate(self.widgets):
+                y = i * widget_height
+                bounds = (0, y, self.renderer.width, widget_height)
 
-            try:
-                widget.render(self.renderer, bounds)
+                try:
+                    widget.render(self.renderer, bounds)
 
-                # Draw separator line between widgets (except for last one)
-                if i < num_widgets - 1:
-                    separator_y = (i + 1) * widget_height - 1
-                    self.renderer.draw_horizontal_line(separator_y, thickness=1)
+                    # Draw separator line between widgets (except for last one)
+                    if i < num_widgets - 1:
+                        separator_y = (i + 1) * widget_height - 1
+                        self.renderer.draw_horizontal_line(separator_y, thickness=1)
 
-            except Exception as e:
-                print(f"Error rendering {widget.get_name()}: {e}")
+                except Exception as e:
+                    print(f"Error rendering {widget.get_name()}: {e}")
 
         # Display on e-ink screen
         image = self.renderer.get_image()
@@ -145,6 +226,12 @@ class Dashboard:
 
             # Main loop
             while self.running:
+                # Check for touch input (if enabled)
+                if self.touch_handler:
+                    touch_event = self.touch_handler.poll()
+                    if touch_event:
+                        self._on_touch_gesture(touch_event)
+
                 # Calculate time until next refresh
                 if self.last_refresh:
                     elapsed = time.time() - self.last_refresh
@@ -152,8 +239,10 @@ class Dashboard:
 
                     if sleep_time > 0:
                         print(f"\nNext update in {int(sleep_time // 60)} min {int(sleep_time % 60)} sec")
+                        if self.multi_screen_mode:
+                            print("Swipe left/right to navigate screens")
                         print("Press Ctrl+C to exit")
-                        time.sleep(min(sleep_time, 60))  # Sleep in chunks to be responsive
+                        time.sleep(min(sleep_time, 1))  # Sleep in short chunks for touch responsiveness
                         continue
 
                 # Time for refresh

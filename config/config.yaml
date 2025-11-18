@@ -5,13 +5,37 @@ display:
   width: 250
   height: 122
   rotation: 0  # 0, 90, 180, 270
+  multi_screen_mode: true  # Enable multi-screen navigation (swipe between screens)
+
+# Touch input settings
+touch:
+  enabled: false  # Set to true when touch hardware is available
+  swipe_threshold: 30  # Minimum pixels for swipe detection
+  long_press_duration: 1.0  # Seconds for long press
 
 # Update settings
 refresh:
   interval_minutes: 15
   startup_full_refresh: true
 
-# Enabled widgets (in order)
+# Multi-screen mode configuration
+# Each screen can contain one or more widgets
+# Swipe left/right to navigate between screens
+screens:
+  - name: home
+    widgets:
+      - clock
+      - weather
+  - name: portfolio
+    widgets:
+      - portfolio
+  # Add more screens as needed:
+  # - name: network
+  #   widgets:
+  #     - network
+
+# Legacy single-screen mode (used if multi_screen_mode: false)
+# All widgets listed here will be displayed on one screen
 widgets:
   - clock
   - weather
@@ -24,11 +48,23 @@ weather:
   show_forecast_days: 3
 
 portfolio:
-  enabled: false
+  show_change: true  # Show percentage change
   symbols:
+    # Stocks (free via yfinance)
     - AAPL
     - GOOGL
+    - MSFT
+    - TSLA
+    # Crypto (free via CoinGecko)
     - BTC-USD
+    - ETH-USD
+  # Examples of other symbols you can add:
+  # - AMZN
+  # - NVDA
+  # - META
+  # - SPY
+  # - SOL-USD
+  # - DOGE-USD
 
 network:
   enabled: false

@@ -4,17 +4,20 @@ A modular, low-power dashboard for Raspberry Pi with e-ink touch display. Displa
 
 ## Features
 
-### Current (Phase 1)
+### Current
 - **Clock Widget**: Current time and date
 - **Weather Widget**: Current conditions and 3-day forecast using Open-Meteo API
+- **Portfolio Widget**: Track stocks and cryptocurrency prices with % change (Phase 2)
+- **Multi-screen Navigation**: Swipe between different dashboard screens (Phase 2)
+- **Touch Support**: Framework for gesture-based navigation (Phase 2)
 - **Configurable refresh**: Default 15-minute updates
 - **Low power**: E-ink display with minimal standby consumption
+- **Two display modes**: Multi-screen or single-screen layout
 
 ### Planned (Future Phases)
-- **Portfolio Tracker**: Stock and crypto prices
 - **Network Monitor**: Bandwidth usage and statistics
-- **Touch Navigation**: Swipe between screens
-- **Multi-screen Dashboard**: Home screen with quick stats
+- **Hardware touch integration**: Full touch support for Waveshare touch controller
+- **Additional widgets**: Calendar, tasks, system stats
 
 ## Hardware Requirements
 
@@ -148,12 +151,27 @@ display:
   width: 250
   height: 122
   rotation: 0  # 0, 90, 180, 270
+  multi_screen_mode: true  # Enable multi-screen navigation
+
+# Touch input (set enabled: true when hardware is available)
+touch:
+  enabled: false
 
 # Update frequency
 refresh:
   interval_minutes: 15  # How often to update
 
-# Enabled widgets (in order)
+# Multi-screen mode: Define screens with widgets
+screens:
+  - name: home
+    widgets:
+      - clock
+      - weather
+  - name: portfolio
+    widgets:
+      - portfolio
+
+# Single-screen mode: List all widgets (used if multi_screen_mode: false)
 widgets:
   - clock
   - weather
@@ -164,7 +182,21 @@ weather:
   longitude: -74.0060
   units: fahrenheit  # fahrenheit or celsius
   show_forecast_days: 3
+
+portfolio:
+  show_change: true  # Show percentage change
+  symbols:
+    - AAPL
+    - GOOGL
+    - BTC-USD
+    - ETH-USD
 ```
+
+### Display Modes
+
+**Multi-screen Mode** (default): Each screen is a separate page you can navigate between by swiping or tapping the edges. This is ideal for organizing different types of information.
+
+**Single-screen Mode**: All widgets are displayed on one screen, split vertically. Set `display.multi_screen_mode: false` to use this mode.
 
 ## Project Structure
 
@@ -174,11 +206,15 @@ sturdy-bassoon/
 │   ├── main.py              # Main application
 │   ├── display/
 │   │   ├── driver.py        # E-ink hardware interface
-│   │   └── renderer.py      # Drawing utilities
+│   │   ├── renderer.py      # Drawing utilities
+│   │   └── screen_manager.py  # Multi-screen navigation
 │   ├── widgets/
 │   │   ├── base.py          # Base widget class
 │   │   ├── clock.py         # Clock widget
-│   │   └── weather.py       # Weather widget
+│   │   ├── weather.py       # Weather widget
+│   │   └── portfolio.py     # Portfolio tracker widget
+│   ├── touch/
+│   │   └── handler.py       # Touch input handling
 │   └── utils/
 │       ├── config.py        # Configuration management
 │       └── api_cache.py     # API caching
@@ -238,8 +274,8 @@ class MyWidget(Widget):
 ## APIs Used
 
 - **Weather**: [Open-Meteo](https://open-meteo.com/) - Free, no API key required
-- **Future - Stocks**: [yfinance](https://github.com/ranaroussi/yfinance) - Free, Yahoo Finance data
-- **Future - Crypto**: [CoinGecko](https://www.coingecko.com/en/api) - Free tier available
+- **Stocks**: [yfinance](https://github.com/ranaroussi/yfinance) - Free, Yahoo Finance data
+- **Crypto**: [CoinGecko](https://www.coingecko.com/en/api) - Free tier, no API key required
 
 ## License
 

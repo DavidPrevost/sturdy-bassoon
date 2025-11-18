@@ -1,0 +1,231 @@
+"""Portfolio widget for tracking stocks and cryptocurrency."""
+import requests
+from datetime import datetime
+from typing import List, Dict, Optional
+from .base import Widget
+from src.display.renderer import Renderer
+
+
+class PortfolioWidget(Widget):
+    """Displays stock and cryptocurrency prices."""
+
+    def __init__(self, config, cache=None):
+        super().__init__(config, cache)
+        self.symbols = config.get('portfolio.symbols', [])
+        self.show_change = config.get('portfolio.show_change', True)
+        self.holdings = []  # List of (symbol, price, change_pct, type) tuples
+
+    def update_data(self) -> bool:
+        """Fetch current prices for all symbols."""
+        if not self.symbols:
+            return False
+
+        if self.cache is None:
+            return self._fetch_prices()
+
+        # Cache for 5 minutes (stock data updates frequently)
+        cache_key = f"portfolio_{'_'.join(self.symbols)}"
+        data = self.cache.get(
+            cache_key,
+            ttl_seconds=300,  # 5 minutes
+            fetch_func=self._fetch_prices
+        )
+
+        if data:
+            self.last_update = datetime.now()
+            return True
+        return False
+
+    def _fetch_prices(self) -> dict:
+        """Fetch prices for all symbols."""
+        self.holdings = []
+
+        for symbol in self.symbols:
+            try:
+                # Determine if it's crypto or stock
+                if self._is_crypto_symbol(symbol):
+                    data = self._fetch_crypto_price(symbol)
+                else:
+                    data = self._fetch_stock_price(symbol)
+
+                if data:
+                    self.holdings.append(data)
+
+            except Exception as e:
+                print(f"Error fetching {symbol}: {e}")
+                # Add placeholder for failed symbols
+                self.holdings.append((symbol, "--", 0.0, "error"))
+
+        print(f"Portfolio updated: {len(self.holdings)} symbols")
+        return {"holdings": self.holdings}
+
+    def _is_crypto_symbol(self, symbol: str) -> bool:
+        """Check if symbol looks like a crypto ticker."""
+        # Common crypto patterns: BTC-USD, ETH-USD, or just BTC, ETH, etc.
+        crypto_keywords = ['BTC', 'ETH', 'USDT', 'BNB', 'SOL', 'ADA', 'DOGE', 'XRP', 'DOT', 'MATIC']
+        symbol_base = symbol.split('-')[0].upper()
+        return symbol_base in crypto_keywords or '-USD' in symbol.upper()
+
+    def _fetch_crypto_price(self, symbol: str) -> Optional[tuple]:
+        """Fetch crypto price from CoinGecko API (free, no key)."""
+        try:
+            # Parse symbol (e.g., BTC-USD -> bitcoin)
+            symbol_base = symbol.split('-')[0].upper()
+
+            # Map common symbols to CoinGecko IDs
+            coin_map = {
+                'BTC': 'bitcoin',
+                'ETH': 'ethereum',
+                'USDT': 'tether',
+                'BNB': 'binancecoin',
+                'SOL': 'solana',
+                'ADA': 'cardano',
+                'DOGE': 'dogecoin',
+                'XRP': 'ripple',
+                'DOT': 'polkadot',
+                'MATIC': 'matic-network',
+                'AVAX': 'avalanche-2',
+                'LINK': 'chainlink',
+                'UNI': 'uniswap',
+                'ATOM': 'cosmos',
+                'LTC': 'litecoin',
+            }
+
+            coin_id = coin_map.get(symbol_base)
+            if not coin_id:
+                print(f"Unknown crypto symbol: {symbol}")
+                return None
+
+            # CoinGecko free API
+            url = f"https://api.coingecko.com/api/v3/simple/price"
+            params = {
+                'ids': coin_id,
+                'vs_currencies': 'usd',
+                'include_24hr_change': 'true'
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if coin_id in data:
+                price = data[coin_id]['usd']
+                change_pct = data[coin_id].get('usd_24h_change', 0.0)
+
+                return (symbol, price, change_pct, 'crypto')
+
+        except Exception as e:
+            print(f"Error fetching crypto {symbol}: {e}")
+            return None
+
+    def _fetch_stock_price(self, symbol: str) -> Optional[tuple]:
+        """Fetch stock price using yfinance."""
+        try:
+            import yfinance as yf
+
+            ticker = yf.Ticker(symbol)
+
+            # Get current data
+            info = ticker.info
+
+            # Try to get current price
+            current_price = info.get('currentPrice') or info.get('regularMarketPrice')
+
+            if current_price is None:
+                # Fallback: get last close from history
+                hist = ticker.history(period='2d')
+                if not hist.empty:
+                    current_price = hist['Close'].iloc[-1]
+                    prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
+                    change_pct = ((current_price - prev_price) / prev_price * 100) if prev_price else 0
+                else:
+                    return None
+            else:
+                # Calculate change percentage
+                prev_close = info.get('previousClose', current_price)
+                change_pct = ((current_price - prev_close) / prev_close * 100) if prev_close else 0
+
+            return (symbol, current_price, change_pct, 'stock')
+
+        except Exception as e:
+            print(f"Error fetching stock {symbol}: {e}")
+            return None
+
+    def render(self, renderer: Renderer, bounds: tuple) -> None:
+        """Render portfolio widget."""
+        x, y, width, height = bounds
+
+        if not self.holdings:
+            self.update_data()
+
+        if not self.holdings:
+            # No data to display
+            renderer.draw_text(
+                "No portfolio data",
+                x + width // 2,
+                y + height // 2,
+                font_size=10,
+                anchor="mm"
+            )
+            return
+
+        # Title
+        renderer.draw_text("Portfolio", x + 5, y + 3, font_size=11, bold=True)
+
+        # Calculate layout
+        start_y = y + 18
+        available_height = height - 20
+        line_height = available_height // len(self.holdings)
+        line_height = min(line_height, 25)  # Cap line height
+
+        # Draw each holding
+        for i, holding in enumerate(self.holdings[:5]):  # Limit to 5 visible
+            symbol, price, change_pct, asset_type = holding
+            line_y = start_y + i * line_height
+
+            # Symbol (left)
+            renderer.draw_text(
+                symbol,
+                x + 5,
+                line_y,
+                font_size=10,
+                bold=True,
+                anchor="lt"
+            )
+
+            # Price (right side)
+            if isinstance(price, (int, float)):
+                # Format price based on magnitude
+                if price < 1:
+                    price_text = f"${price:.4f}"
+                elif price < 100:
+                    price_text = f"${price:.2f}"
+                else:
+                    price_text = f"${price:,.0f}"
+            else:
+                price_text = str(price)
+
+            # Get price text width to right-align
+            price_width, _ = renderer.get_text_size(price_text, font_size=10)
+            price_x = x + width - price_width - 5
+
+            renderer.draw_text(
+                price_text,
+                price_x,
+                line_y,
+                font_size=10,
+                anchor="lt"
+            )
+
+            # Change percentage (below price, if enabled)
+            if self.show_change and isinstance(change_pct, (int, float)):
+                change_text = f"{change_pct:+.1f}%"
+                change_color = 0  # Black for e-ink
+
+                renderer.draw_text(
+                    change_text,
+                    price_x,
+                    line_y + 11,
+                    font_size=8,
+                    anchor="lt"
+                )
