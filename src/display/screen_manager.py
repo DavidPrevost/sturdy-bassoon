@@ -130,8 +130,35 @@ class ScreenManager:
             self._draw_screen_indicators(renderer)
 
     def _draw_screen_indicators(self, renderer: Renderer):
-        """Draw dots at the bottom indicating current screen."""
+        """Draw navigation arrows and dots at the bottom."""
         num_screens = len(self.screens)
+
+        # Draw navigation arrows on left and right
+        bottom_y = renderer.height - 8
+
+        # Left arrow (previous screen) - only show if not on first screen
+        if self.current_index > 0:
+            renderer.draw_text(
+                "<",
+                5,
+                bottom_y,
+                font_size=10,
+                bold=True,
+                anchor="lt"
+            )
+
+        # Right arrow (next screen) - only show if not on last screen
+        if self.current_index < num_screens - 1:
+            renderer.draw_text(
+                ">",
+                renderer.width - 10,
+                bottom_y,
+                font_size=10,
+                bold=True,
+                anchor="rt"
+            )
+
+        # Draw screen indicator dots in the center
         dot_size = 3
         dot_spacing = 8
         total_width = (num_screens * dot_size) + ((num_screens - 1) * (dot_spacing - dot_size))

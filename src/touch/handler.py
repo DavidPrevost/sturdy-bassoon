@@ -173,6 +173,9 @@ class TouchHandler:
                     num_points = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x02)
 
                     if num_points > 0:
+                        if not hasattr(self, '_touch_debug_shown'):
+                            print(f"[DEBUG] Touch detected! num_points={num_points}")
+                            self._touch_debug_shown = True
                         # Read touch coordinates
                         # X position: registers 0x03-0x04 (high byte, low byte)
                         # Y position: registers 0x05-0x06 (high byte, low byte)
