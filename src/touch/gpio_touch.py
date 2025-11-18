@@ -73,20 +73,74 @@ class TouchGPIO:
         if self.gpio_mode == 'RPi.GPIO':
             # Standard reset sequence: LOW -> wait -> HIGH
             self.gpio.output(self.rst_pin, self.gpio.LOW)
-            time.sleep(0.01)  # 10ms low
+            time.sleep(0.02)  # 20ms low (increased for reliability)
 
             self.gpio.output(self.rst_pin, self.gpio.HIGH)
-            time.sleep(0.05)  # 50ms to stabilize
+            time.sleep(0.1)  # 100ms to stabilize (increased for boot time)
 
         elif self.gpio_mode == 'gpiozero':
             # gpiozero: off -> wait -> on
             self.rst_gpio.off()  # Pull low
-            time.sleep(0.01)
+            time.sleep(0.02)
 
             self.rst_gpio.on()   # Pull high
-            time.sleep(0.05)
+            time.sleep(0.1)
 
         print("Touch controller reset complete")
+
+        # Now perform I2C initialization sequence
+        self._i2c_wake_sequence()
+
+    def _i2c_wake_sequence(self):
+        """Perform I2C wake/configuration sequence after GPIO reset."""
+        try:
+            import smbus2
+            bus = smbus2.SMBus(1)
+            addr = 0x14
+
+            print("Performing I2C wake sequence...")
+
+            # Method 1: Exit sleep mode via power register
+            try:
+                bus.write_byte_data(addr, 0xFE, 0x00)  # Exit sleep mode
+                time.sleep(0.05)
+                print("  ✓ Wrote to power management register (0xFE)")
+            except Exception as e:
+                print(f"  ✗ Power register write failed: {e}")
+
+            # Method 2: Trigger calibration/reset via command register
+            try:
+                bus.write_byte_data(addr, 0xFA, 0x00)  # Normal mode (not factory reset)
+                time.sleep(0.05)
+                print("  ✓ Wrote to command register (0xFA)")
+            except Exception as e:
+                print(f"  ✗ Command register write failed: {e}")
+
+            # Method 3: Read chip ID to confirm controller is responsive
+            try:
+                chip_id = bus.read_byte_data(addr, 0xA7)
+                print(f"  ✓ Chip ID: 0x{chip_id:02X}")
+            except Exception as e:
+                print(f"  ✗ Chip ID read failed: {e}")
+
+            # Method 4: Configure interrupt mode (if needed)
+            try:
+                # Some controllers need interrupt mode configured
+                # 0xFA: Motion mask register (enable touch reporting)
+                bus.write_byte_data(addr, 0xFA, 0x01)  # Enable touch events
+                time.sleep(0.01)
+                print("  ✓ Configured touch event reporting")
+            except Exception as e:
+                # Not critical if this fails
+                pass
+
+            print("I2C wake sequence complete")
+            bus.close()
+
+        except ImportError:
+            print("Warning: smbus2 not available, skipping I2C wake sequence")
+        except Exception as e:
+            print(f"Warning: I2C wake sequence failed: {e}")
 
     def cleanup(self):
         """Cleanup GPIO resources."""

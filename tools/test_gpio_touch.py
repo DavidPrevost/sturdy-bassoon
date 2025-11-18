@@ -126,9 +126,9 @@ def main():
 
     # Step 3: Read initial register state
     print("\n[Step 3] Reading touch data registers (0x00-0x0F)...")
-    time.sleep(0.1)  # Brief delay for controller to stabilize
+    time.sleep(0.2)  # Brief delay for controller to stabilize after I2C init
     registers = read_touch_registers(bus, touch_addr, 0x00, 16)
-    print_registers(registers, "Touch Data Registers After GPIO Reset")
+    print_registers(registers, "Touch Data Registers After Initialization")
 
     # Check if registers are non-zero (good sign)
     non_zero_count = sum(1 for _, val in registers if val is not None and val != 0)
@@ -140,6 +140,17 @@ def main():
         print("  Touch the screen during monitoring to verify functionality.")
     else:
         print("\n✓ Touch controller appears to be responding!")
+
+    # Step 3.5: Check chip ID registers to confirm controller is alive
+    print("\n[Step 3.5] Reading chip identification registers...")
+    chip_regs = read_touch_registers(bus, touch_addr, 0xA0, 16)
+    print_registers(chip_regs, "Chip ID Registers (0xA0-0xAF)")
+
+    # Specifically check common ID registers
+    chip_id_a7 = bus.read_byte_data(touch_addr, 0xA7)
+    print(f"\nChip ID (0xA7): 0x{chip_id_a7:02X}")
+    if chip_id_a7 != 0x00:
+        print("✓ Touch controller IC is responding to I2C")
 
     # Step 4: Monitor for touch events
     try:
