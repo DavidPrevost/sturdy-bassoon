@@ -170,14 +170,9 @@ class WeatherWidget(Widget):
         """Render weather widget."""
         x, y, width, height = bounds
 
-        if self.current_temp is None:
-            self.update_data()
-
-        # Ensure we have valid values (fallback if update failed)
-        if self.current_temp is None:
-            self.current_temp = "--"
-        if self.current_condition is None:
-            self.current_condition = "Unavailable"
+        # Use temporary display values (don't permanently overwrite None)
+        display_temp = self.current_temp if self.current_temp is not None else "--"
+        display_condition = self.current_condition if self.current_condition is not None else "Unavailable"
 
         # Determine unit symbol
         unit = "°F" if self.units == 'fahrenheit' else "°C"
@@ -201,7 +196,7 @@ class WeatherWidget(Widget):
         temp_y = y + height // 3 + 5  # Shift down to make room for location
 
         # Temperature (large)
-        temp_text = f"{self.current_temp}{unit}"
+        temp_text = f"{display_temp}{unit}"
         renderer.draw_text(
             temp_text,
             current_x,
@@ -214,7 +209,7 @@ class WeatherWidget(Widget):
         # Condition (below temperature)
         condition_y = temp_y + 22
         renderer.draw_text(
-            str(self.current_condition),
+            str(display_condition),
             current_x,
             condition_y,
             font_size=9,
