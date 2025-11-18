@@ -9,7 +9,7 @@ display:
 
 # Touch input settings
 touch:
-  enabled: false  # Set to true when touch hardware is available
+  enabled: true  # Waveshare 2.13" V4 has capacitive touch support
   swipe_threshold: 30  # Minimum pixels for swipe detection
   long_press_duration: 1.0  # Seconds for long press
 
