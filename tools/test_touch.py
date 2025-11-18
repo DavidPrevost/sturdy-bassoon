@@ -74,6 +74,55 @@ def monitor_touch(bus, addr):
         print("\n\nMonitoring stopped")
 
 
+def try_wake_controller(bus, addr):
+    """Try various methods to wake up the touch controller."""
+    print("\nAttempting to wake up touch controller...")
+
+    # Method 1: Write to power management register
+    print("  [1] Trying power management register...")
+    try:
+        # Many controllers use register 0xA5 or 0xFE for power
+        bus.write_byte_data(addr, 0xFE, 0x00)  # Exit sleep mode
+        time.sleep(0.1)
+        print("      Wrote 0x00 to register 0xFE")
+    except Exception as e:
+        print(f"      Failed: {e}")
+
+    # Method 2: Try chip ID register read (often wakes chip)
+    print("  [2] Reading chip ID registers...")
+    try:
+        chip_id_regs = [0xA3, 0xA7, 0xA8, 0xA9]
+        for reg in chip_id_regs:
+            val = bus.read_byte_data(addr, reg)
+            if val != 0x00:
+                print(f"      Reg 0x{reg:02X} = 0x{val:02X} (possible chip ID!)")
+    except Exception as e:
+        print(f"      Failed: {e}")
+
+    # Method 3: Soft reset
+    print("  [3] Trying soft reset...")
+    try:
+        bus.write_byte_data(addr, 0xFA, 0x01)  # Reset command
+        time.sleep(0.1)
+        print("      Reset command sent")
+    except Exception as e:
+        print(f"      Failed: {e}")
+
+    # Method 4: Read version info (CST816S specific)
+    print("  [4] Reading version registers...")
+    try:
+        version_regs = [0x15, 0xA7, 0xA8, 0xA9]
+        for reg in version_regs:
+            val = bus.read_byte_data(addr, reg)
+            if val != 0x00:
+                print(f"      Reg 0x{reg:02X} = 0x{val:02X}")
+    except Exception as e:
+        print(f"      Failed: {e}")
+
+    print("\n  Checking if controller is now responsive...")
+    time.sleep(0.2)
+
+
 def main():
     """Main entry point."""
     print("="*60)
@@ -95,12 +144,22 @@ def main():
         print(f"✗ Error connecting to touch controller: {e}")
         sys.exit(1)
 
+    # Try to wake up the controller
+    try_wake_controller(bus, touch_addr)
+
     # Read initial state
     print("\n" + "="*60)
-    print("Initial Register State (0x00-0x0F)")
+    print("Register State After Wake Attempt (0x00-0x0F)")
     print("="*60)
     registers = read_register_range(bus, touch_addr, 0x00, 16)
     print_registers(registers)
+
+    # Also check extended registers
+    print("\n" + "="*60)
+    print("Extended Registers (0xA0-0xAF)")
+    print("="*60)
+    registers_ext = read_register_range(bus, touch_addr, 0xA0, 16)
+    print_registers(registers_ext)
 
     # Start monitoring
     print("\n" + "="*60)
