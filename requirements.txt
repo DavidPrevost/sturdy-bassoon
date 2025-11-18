@@ -1,0 +1,17 @@
+# E-ink display library for Waveshare displays
+Pillow>=10.0.0
+spidev>=3.6
+RPi.GPIO>=0.7.1
+gpiozero>=2.0
+
+# API and data fetching
+requests>=2.31.0
+
+# System monitoring
+psutil>=5.9.0
+
+# Configuration
+PyYAML>=6.0
+
+# Optional: Stock data (for future portfolio widget)
+yfinance>=0.2.28

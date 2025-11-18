@@ -1,0 +1,36 @@
+# E-ink Dashboard Configuration
+
+# Display settings
+display:
+  width: 250
+  height: 122
+  rotation: 0  # 0, 90, 180, 270
+
+# Update settings
+refresh:
+  interval_minutes: 15
+  startup_full_refresh: true
+
+# Enabled widgets (in order)
+widgets:
+  - clock
+  - weather
+
+# Widget-specific settings
+weather:
+  latitude: 40.7128  # New York City (change to your location)
+  longitude: -74.0060
+  units: fahrenheit  # fahrenheit or celsius
+  show_forecast_days: 3
+
+portfolio:
+  enabled: false
+  symbols:
+    - AAPL
+    - GOOGL
+    - BTC-USD
+
+network:
+  enabled: false
+  show_bandwidth: true
+  show_devices: false
