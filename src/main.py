@@ -72,6 +72,7 @@ class Dashboard:
 
         self.running = False
         self.last_refresh = None
+        self.last_status_print = 0  # Track when we last printed status
 
     def _load_widgets(self):
         """Load enabled widgets from configuration."""
@@ -310,10 +311,15 @@ class Dashboard:
                     sleep_time = self.refresh_interval - elapsed
 
                     if sleep_time > 0:
-                        print(f"\nNext update in {int(sleep_time // 60)} min {int(sleep_time % 60)} sec")
-                        if self.multi_screen_mode:
-                            print("Swipe left/right to navigate screens")
-                        print("Press Ctrl+C to exit")
+                        # Only print status every 60 seconds to avoid spam
+                        current_time = time.time()
+                        if current_time - self.last_status_print >= 60:
+                            print(f"\nNext update in {int(sleep_time // 60)} min {int(sleep_time % 60)} sec")
+                            if self.multi_screen_mode:
+                                print("Tap left/right edges (or < > arrows) to navigate screens")
+                            print("Press Ctrl+C to exit")
+                            self.last_status_print = current_time
+
                         time.sleep(min(sleep_time, 1))  # Sleep in short chunks for touch responsiveness
                         continue
 
