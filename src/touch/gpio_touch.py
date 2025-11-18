@@ -67,80 +67,75 @@ class TouchGPIO:
         return True
 
     def reset_touch_controller(self):
-        """Reset the touch controller using GPIO."""
-        print("Resetting touch controller...")
+        """Reset the touch controller using GPIO.
+
+        GT1151 reset sequence: HIGH -> LOW -> HIGH
+        (Note: This is opposite of most touch controllers!)
+        """
+        print("Resetting touch controller (GT1151 sequence)...")
 
         if self.gpio_mode == 'RPi.GPIO':
-            # Standard reset sequence: LOW -> wait -> HIGH
+            # GT1151 specific reset sequence: HIGH -> LOW -> HIGH
+            self.gpio.output(self.rst_pin, self.gpio.HIGH)
+            time.sleep(0.1)  # 100ms high
+
             self.gpio.output(self.rst_pin, self.gpio.LOW)
-            time.sleep(0.02)  # 20ms low (increased for reliability)
+            time.sleep(0.1)  # 100ms low
 
             self.gpio.output(self.rst_pin, self.gpio.HIGH)
-            time.sleep(0.1)  # 100ms to stabilize (increased for boot time)
+            time.sleep(0.1)  # 100ms to stabilize
 
         elif self.gpio_mode == 'gpiozero':
-            # gpiozero: off -> wait -> on
+            # gpiozero: on -> off -> on
+            self.rst_gpio.on()   # Pull high
+            time.sleep(0.1)
+
             self.rst_gpio.off()  # Pull low
-            time.sleep(0.02)
+            time.sleep(0.1)
 
             self.rst_gpio.on()   # Pull high
             time.sleep(0.1)
 
         print("Touch controller reset complete")
 
-        # Now perform I2C initialization sequence
-        self._i2c_wake_sequence()
+        # Read version to verify controller is alive
+        self._read_version()
 
-    def _i2c_wake_sequence(self):
-        """Perform I2C wake/configuration sequence after GPIO reset."""
+    def _read_version(self):
+        """Read GT1151 version register to verify controller is responsive."""
         try:
             import smbus2
             bus = smbus2.SMBus(1)
             addr = 0x14
 
-            print("Performing I2C wake sequence...")
+            print("Reading GT1151 version...")
 
-            # Method 1: Exit sleep mode via power register
-            try:
-                bus.write_byte_data(addr, 0xFE, 0x00)  # Exit sleep mode
-                time.sleep(0.05)
-                print("  ✓ Wrote to power management register (0xFE)")
-            except Exception as e:
-                print(f"  ✗ Power register write failed: {e}")
+            # GT1151 version is at register 0x8140 (4 bytes)
+            # Need to write the register address as 16-bit
+            version_data = bus.read_i2c_block_data(addr, 0x40, 4)  # Read from 0x8140
 
-            # Method 2: Trigger calibration/reset via command register
-            try:
-                bus.write_byte_data(addr, 0xFA, 0x00)  # Normal mode (not factory reset)
-                time.sleep(0.05)
-                print("  ✓ Wrote to command register (0xFA)")
-            except Exception as e:
-                print(f"  ✗ Command register write failed: {e}")
-
-            # Method 3: Read chip ID to confirm controller is responsive
-            try:
-                chip_id = bus.read_byte_data(addr, 0xA7)
-                print(f"  ✓ Chip ID: 0x{chip_id:02X}")
-            except Exception as e:
-                print(f"  ✗ Chip ID read failed: {e}")
-
-            # Method 4: Configure interrupt mode (if needed)
-            try:
-                # Some controllers need interrupt mode configured
-                # 0xFA: Motion mask register (enable touch reporting)
-                bus.write_byte_data(addr, 0xFA, 0x01)  # Enable touch events
-                time.sleep(0.01)
-                print("  ✓ Configured touch event reporting")
-            except Exception as e:
-                # Not critical if this fails
-                pass
-
-            print("I2C wake sequence complete")
+            print(f"  ✓ Version data: {[hex(b) for b in version_data]}")
             bus.close()
 
         except ImportError:
-            print("Warning: smbus2 not available, skipping I2C wake sequence")
+            print("Warning: smbus2 not available, skipping version read")
         except Exception as e:
-            print(f"Warning: I2C wake sequence failed: {e}")
+            print(f"Warning: Version read failed: {e}")
+            print("  (This may be normal - continuing anyway)")
+
+    def read_int_pin(self):
+        """Read the interrupt pin state.
+
+        Returns:
+            int: 0 if touch detected (INT pulled low), 1 if no touch
+        """
+        if self.gpio_mode == 'RPi.GPIO':
+            return self.gpio.input(self.int_pin)
+        elif self.gpio_mode == 'gpiozero':
+            # Button.is_pressed is True when pin is LOW (pulled down)
+            # We want: 0 = touch (LOW), 1 = no touch (HIGH)
+            return 0 if self.int_gpio.is_pressed else 1
+        return 1  # Default to no touch
 
     def cleanup(self):
         """Cleanup GPIO resources."""

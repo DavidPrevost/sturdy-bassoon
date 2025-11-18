@@ -176,46 +176,65 @@ class TouchHandler:
                         self._long_press_fired = True
                         return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
 
-            # Alternative: Direct I2C reading (if using I2C fallback)
-            elif hasattr(self, 'i2c_bus'):
-                # Read touch data from I2C controller (address 0x14)
-                # This controller (likely CST816S or similar) has touch data at specific registers
+            # Alternative: GT1151 interrupt-based I2C reading
+            elif hasattr(self, 'i2c_bus') and self.gpio_touch:
+                # GT1151 uses interrupt-based touch detection
+                # Only read I2C when INT pin goes LOW
                 try:
-                    # Read touch status register
-                    # Register 0x02 typically contains number of touch points
-                    num_points = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x02)
+                    int_state = self.gpio_touch.read_int_pin()
 
-                    if num_points > 0:
-                        if not hasattr(self, '_touch_debug_shown'):
-                            print(f"[DEBUG] Touch detected! num_points={num_points}")
-                            self._touch_debug_shown = True
-                        # Read touch coordinates
-                        # X position: registers 0x03-0x04 (high byte, low byte)
-                        # Y position: registers 0x05-0x06 (high byte, low byte)
-                        x_high = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x03)
-                        x_low = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x04)
-                        y_high = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x05)
-                        y_low = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x06)
+                    if int_state == 0:  # INT pin LOW = touch detected
+                        # Read GT1151 status register (0x814E)
+                        status = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x4E)
 
-                        x = ((x_high & 0x0F) << 8) | x_low
-                        y = ((y_high & 0x0F) << 8) | y_low
+                        # Check if valid touch data (bit 0x80 set)
+                        if status & 0x80:
+                            touch_count = status & 0x0F  # Lower 4 bits = number of touches
 
-                        if self.touch_start is None:
-                            # New touch started
-                            self.touch_start = (x, y)
-                            self.touch_start_time = time.time()
-                            self.touch_current = (x, y)
+                            if 1 <= touch_count <= 5:
+                                # Read touch data from 0x814F (8 bytes per touch)
+                                touch_data = self.i2c_bus.read_i2c_block_data(
+                                    self.touch_i2c_addr, 0x4F, touch_count * 8
+                                )
+
+                                # Clear status register to acknowledge touch
+                                self.i2c_bus.write_byte_data(self.touch_i2c_addr, 0x4E, 0x00)
+
+                                # Parse first touch point (bytes 0-7)
+                                # Byte 0: Track ID
+                                # Bytes 1-2: X coordinate (little endian)
+                                # Bytes 3-4: Y coordinate (little endian)
+                                # Bytes 5-6: Size/pressure
+                                x = (touch_data[2] << 8) | touch_data[1]
+                                y = (touch_data[4] << 8) | touch_data[3]
+
+                                if not hasattr(self, '_touch_debug_shown'):
+                                    print(f"✓ Touch detected! X={x}, Y={y}")
+                                    self._touch_debug_shown = True
+
+                                if self.touch_start is None:
+                                    # New touch started
+                                    self.touch_start = (x, y)
+                                    self.touch_start_time = time.time()
+                                    self.touch_current = (x, y)
+                                else:
+                                    # Touch continuing - update current position
+                                    self.touch_current = (x, y)
+
+                                    # Check for long press
+                                    duration = time.time() - self.touch_start_time
+                                    if duration > self.long_press_duration and not self._long_press_fired:
+                                        self._long_press_fired = True
+                                        return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
+                            else:
+                                # Invalid touch count
+                                self.i2c_bus.write_byte_data(self.touch_i2c_addr, 0x4E, 0x00)
                         else:
-                            # Touch continuing - update current position
-                            self.touch_current = (x, y)
+                            # No valid touch data, clear status anyway
+                            self.i2c_bus.write_byte_data(self.touch_i2c_addr, 0x4E, 0x00)
 
-                            # Check for long press
-                            duration = time.time() - self.touch_start_time
-                            if duration > self.long_press_duration and not self._long_press_fired:
-                                self._long_press_fired = True
-                                return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
-                    else:
-                        # No touch - check if touch was released
+                    else:  # INT pin HIGH = no touch
+                        # Check if touch was released
                         if self.touch_start is not None:
                             # Touch was released, detect gesture
                             end_pos = self.touch_current or self.touch_start
@@ -235,8 +254,11 @@ class TouchHandler:
                             self._long_press_fired = False
 
                             return event
-                except:
+                except Exception as e:
                     # I2C read error, skip this poll
+                    if not hasattr(self, '_i2c_error_shown'):
+                        print(f"Touch I2C error: {e}")
+                        self._i2c_error_shown = True
                     pass
 
         except Exception as e:
