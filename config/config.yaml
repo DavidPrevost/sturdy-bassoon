@@ -26,9 +26,10 @@ screens:
     widgets:
       - clock
       - weather
-  - name: portfolio
-    widgets:
-      - portfolio
+  # Portfolio screen disabled due to yfinance dependency issues on Pi Zero
+  # - name: portfolio
+  #   widgets:
+  #     - portfolio
   - name: network
     widgets:
       - network
