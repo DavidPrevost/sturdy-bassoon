@@ -18,6 +18,7 @@ from src.touch.handler import TouchHandler, Gesture
 from src.widgets.clock import ClockWidget
 from src.widgets.weather import WeatherWidget
 from src.widgets.portfolio import PortfolioWidget
+from src.widgets.network import NetworkWidget
 
 
 class Dashboard:
@@ -78,6 +79,7 @@ class Dashboard:
             'clock': ClockWidget,
             'weather': WeatherWidget,
             'portfolio': PortfolioWidget,
+            'network': NetworkWidget,
         }
 
         for widget_name in enabled:
@@ -108,6 +110,7 @@ class Dashboard:
             'clock': ClockWidget,
             'weather': WeatherWidget,
             'portfolio': PortfolioWidget,
+            'network': NetworkWidget,
         }
 
         for screen_config in screen_configs:

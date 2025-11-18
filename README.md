@@ -7,17 +7,22 @@ A modular, low-power dashboard for Raspberry Pi with e-ink touch display. Displa
 ### Current
 - **Clock Widget**: Current time and date
 - **Weather Widget**: Current conditions and 3-day forecast using Open-Meteo API
-- **Portfolio Widget**: Track stocks and cryptocurrency prices with % change (Phase 2)
-- **Multi-screen Navigation**: Swipe between different dashboard screens (Phase 2)
-- **Touch Support**: Framework for gesture-based navigation (Phase 2)
+- **Portfolio Widget**: Track stocks and cryptocurrency prices with % change
+- **Network Monitor**: Real-time bandwidth usage and network statistics (Phase 3)
+  - Upload/download speeds
+  - Total bytes sent/received
+  - Auto-detects active network interface
+- **Multi-screen Navigation**: Swipe between different dashboard screens
+- **Touch Support**: Framework for gesture-based navigation
 - **Configurable refresh**: Default 15-minute updates
 - **Low power**: E-ink display with minimal standby consumption
 - **Two display modes**: Multi-screen or single-screen layout
 
-### Planned (Future Phases)
-- **Network Monitor**: Bandwidth usage and statistics
+### Planned (Future Enhancements)
 - **Hardware touch integration**: Full touch support for Waveshare touch controller
-- **Additional widgets**: Calendar, tasks, system stats
+- **Additional widgets**: Calendar, tasks, system stats, RSS feeds
+- **Advanced network features**: Connected devices, Pi-hole integration
+- **Customization**: Themes, widget positioning, more layout options
 
 ## Hardware Requirements
 
@@ -170,6 +175,9 @@ screens:
   - name: portfolio
     widgets:
       - portfolio
+  - name: network
+    widgets:
+      - network
 
 # Single-screen mode: List all widgets (used if multi_screen_mode: false)
 widgets:
@@ -190,6 +198,11 @@ portfolio:
     - GOOGL
     - BTC-USD
     - ETH-USD
+
+network:
+  show_bandwidth: true
+  show_devices: false
+  interface: null  # Auto-detect, or specify "wlan0", "eth0", etc.
 ```
 
 ### Display Modes
@@ -212,7 +225,8 @@ sturdy-bassoon/
 │   │   ├── base.py          # Base widget class
 │   │   ├── clock.py         # Clock widget
 │   │   ├── weather.py       # Weather widget
-│   │   └── portfolio.py     # Portfolio tracker widget
+│   │   ├── portfolio.py     # Portfolio tracker widget
+│   │   └── network.py       # Network monitor widget
 │   ├── touch/
 │   │   └── handler.py       # Touch input handling
 │   └── utils/

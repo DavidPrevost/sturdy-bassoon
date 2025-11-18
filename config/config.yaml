@@ -29,10 +29,14 @@ screens:
   - name: portfolio
     widgets:
       - portfolio
-  # Add more screens as needed:
-  # - name: network
+  - name: network
+    widgets:
+      - network
+  # You can also combine widgets on one screen:
+  # - name: stats
   #   widgets:
   #     - network
+  #     - portfolio
 
 # Legacy single-screen mode (used if multi_screen_mode: false)
 # All widgets listed here will be displayed on one screen
@@ -67,6 +71,6 @@ portfolio:
   # - DOGE-USD
 
 network:
-  enabled: false
-  show_bandwidth: true
-  show_devices: false
+  show_bandwidth: true     # Show upload/download speeds and totals
+  show_devices: false      # Show number of active connections (requires elevated permissions)
+  interface: null          # null = auto-detect, or specify: "wlan0", "eth0", etc.
