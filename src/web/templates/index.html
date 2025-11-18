@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-ink Dashboard Control Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #222;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input[type="text"]:focus,
+        input[type="number"]:focus,
+        select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.secondary:hover {
+            background: #545b62;
+        }
+
+        button.danger {
+            background: #dc3545;
+        }
+
+        button.danger:hover {
+            background: #c82333;
+        }
+
+        .symbol-list {
+            list-style: none;
+            margin-top: 15px;
+        }
+
+        .symbol-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background: #f9f9f9;
+        }
+
+        .symbol-name {
+            font-weight: 500;
+            font-family: 'Courier New', monospace;
+        }
+
+        .add-symbol-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .add-symbol-form input {
+            flex: 1;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+        }
+
+        .current-location {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🖥️ E-ink Dashboard Control Panel</h1>
+        <p class="subtitle">Manage your Raspberry Pi e-ink display settings</p>
+
+        <!-- Alerts -->
+        <div id="alert" class="alert"></div>
+
+        <!-- Weather Settings -->
+        <div class="card">
+            <h2>🌤️ Weather Settings</h2>
+
+            <div class="current-location">
+                <strong>Current Location:</strong>
+                {% if config.weather.location_name %}
+                    {{ config.weather.location_name }}
+                {% elif config.weather.zip_code %}
+                    ZIP {{ config.weather.zip_code }}
+                {% else %}
+                    {{ config.weather.latitude }}, {{ config.weather.longitude }}
+                {% endif %}
+            </div>
+
+            <div class="form-group">
+                <label for="zipCode">ZIP Code</label>
+                <input type="text" id="zipCode" placeholder="Enter 5-digit ZIP code" maxlength="5">
+            </div>
+
+            <button onclick="updateWeatherLocation()">Update Location</button>
+        </div>
+
+        <!-- Portfolio Settings -->
+        <div class="card">
+            <h2>📈 Portfolio Watchlist</h2>
+
+            <div class="add-symbol-form">
+                <input type="text" id="newSymbol" placeholder="Enter symbol (e.g., AAPL, BTC-USD)" maxlength="10">
+                <button onclick="addSymbol()">Add Symbol</button>
+            </div>
+
+            <ul class="symbol-list" id="symbolList">
+                {% for symbol in config.portfolio.symbols %}
+                <li class="symbol-item">
+                    <span class="symbol-name">{{ symbol }}</span>
+                    <button class="danger" onclick="removeSymbol('{{ symbol }}')">Remove</button>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- General Settings -->
+        <div class="card">
+            <h2>⚙️ General Settings</h2>
+
+            <div class="form-group">
+                <label for="refreshInterval">Refresh Interval (minutes)</label>
+                <input type="number" id="refreshInterval" value="{{ config.refresh.interval_minutes }}" min="1" max="60">
+            </div>
+
+            <div class="form-group">
+                <label for="weatherUnits">Temperature Units</label>
+                <select id="weatherUnits">
+                    <option value="fahrenheit" {% if config.weather.units == 'fahrenheit' %}selected{% endif %}>Fahrenheit (°F)</option>
+                    <option value="celsius" {% if config.weather.units == 'celsius' %}selected{% endif %}>Celsius (°C)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="networkBandwidth" {% if config.network.show_bandwidth %}checked{% endif %}>
+                    <label for="networkBandwidth">Show Network Bandwidth</label>
+                </div>
+            </div>
+
+            <button onclick="updateSettings()">Save Settings</button>
+        </div>
+
+        <!-- Info -->
+        <div class="card">
+            <h2>ℹ️ Information</h2>
+            <p><strong>Config File:</strong> config/config.yaml</p>
+            <p><strong>Note:</strong> Changes take effect on the next display refresh cycle.</p>
+            <p><strong>Dashboard URL:</strong> http://{{ request.host }}</p>
+        </div>
+    </div>
+
+    <script>
+        function showAlert(message, type = 'success') {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.className = `alert ${type}`;
+            alert.style.display = 'block';
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        async function updateWeatherLocation() {
+            const zipCode = document.getElementById('zipCode').value.trim();
+
+            if (!zipCode || zipCode.length !== 5) {
+                showAlert('Please enter a valid 5-digit ZIP code', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/weather/location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ zip_code: zipCode })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Location updated to ${data.location}!`, 'success');
+                    setTimeout(() => location.reload(), 2000);
+                } else {
+                    showAlert(data.error || 'Failed to update location', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        async function addSymbol() {
+            const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+
+            if (!symbol) {
+                showAlert('Please enter a symbol', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/portfolio/symbol', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol: symbol })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Added ${symbol} to watchlist!`, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert(data.error || 'Failed to add symbol', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        async function removeSymbol(symbol) {
+            if (!confirm(`Remove ${symbol} from watchlist?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/portfolio/symbol/${symbol}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Removed ${symbol} from watchlist`, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert('Failed to remove symbol', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        async function updateSettings() {
+            const settings = {
+                refresh_interval: parseInt(document.getElementById('refreshInterval').value),
+                weather_units: document.getElementById('weatherUnits').value,
+                network_show_bandwidth: document.getElementById('networkBandwidth').checked
+            };
+
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('Settings updated successfully!', 'success');
+                } else {
+                    showAlert(data.error || 'Failed to update settings', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        // Allow Enter key to submit forms
+        document.getElementById('zipCode').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') updateWeatherLocation();
+        });
+
+        document.getElementById('newSymbol').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addSymbol();
+        });
+    </script>
+</body>
+</html>

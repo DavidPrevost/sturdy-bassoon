@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 from .base import Widget
 from src.display.renderer import Renderer
+from src.utils.geocoding import Geocoder
 
 
 class WeatherWidget(Widget):
@@ -38,8 +39,17 @@ class WeatherWidget(Widget):
 
     def __init__(self, config, cache=None):
         super().__init__(config, cache)
+
+        # Support both ZIP code and lat/long
+        self.zip_code = config.get('weather.zip_code', None)
         self.latitude = config.get('weather.latitude', 40.7128)
         self.longitude = config.get('weather.longitude', -74.0060)
+        self.location_name = config.get('weather.location_name', None)
+
+        # If ZIP code is provided, geocode it
+        if self.zip_code and Geocoder.validate_zip(self.zip_code):
+            self.set_location_from_zip(self.zip_code)
+
         self.units = config.get('weather.units', 'fahrenheit')
         self.forecast_days = config.get('weather.show_forecast_days', 3)
 
@@ -115,6 +125,47 @@ class WeatherWidget(Widget):
             self.current_condition = self.current_condition or "Unavailable"
             return None
 
+    def set_location_from_zip(self, zip_code: str) -> bool:
+        """
+        Set location using ZIP code.
+
+        Args:
+            zip_code: 5-digit US ZIP code
+
+        Returns:
+            True if successful
+        """
+        if not Geocoder.validate_zip(zip_code):
+            print(f"Invalid ZIP code: {zip_code}")
+            return False
+
+        result = Geocoder.zip_to_coords(zip_code)
+        if result:
+            lat, lon, city = result
+            self.latitude = lat
+            self.longitude = lon
+            self.zip_code = zip_code
+            self.location_name = city
+
+            # Clear cache to force refresh
+            if self.cache:
+                cache_key = f"weather_{self.latitude}_{self.longitude}"
+                self.cache.clear(cache_key)
+
+            print(f"Location set to {city} (ZIP {zip_code})")
+            return True
+
+        return False
+
+    def get_location_display(self) -> str:
+        """Get location string for display."""
+        if self.location_name:
+            return self.location_name
+        elif self.zip_code:
+            return f"ZIP {self.zip_code}"
+        else:
+            return f"{self.latitude:.2f}, {self.longitude:.2f}"
+
     def render(self, renderer: Renderer, bounds: tuple) -> None:
         """Render weather widget."""
         x, y, width, height = bounds
@@ -125,13 +176,23 @@ class WeatherWidget(Widget):
         # Determine unit symbol
         unit = "°F" if self.units == 'fahrenheit' else "°C"
 
+        # Draw location name at top
+        location_display = self.get_location_display()
+        renderer.draw_text(
+            location_display,
+            x + width // 2,
+            y + 3,
+            font_size=9,
+            anchor="mt"
+        )
+
         # Layout: Current weather on left, forecast on right
         left_width = width // 2
         right_width = width - left_width
 
         # Draw current weather (left side)
         current_x = x + left_width // 2
-        temp_y = y + height // 3
+        temp_y = y + height // 3 + 5  # Shift down to make room for location
 
         # Temperature (large)
         temp_text = f"{self.current_temp}{unit}"
@@ -139,18 +200,18 @@ class WeatherWidget(Widget):
             temp_text,
             current_x,
             temp_y,
-            font_size=24,
+            font_size=20,
             bold=True,
             anchor="mm"
         )
 
         # Condition (below temperature)
-        condition_y = temp_y + 25
+        condition_y = temp_y + 22
         renderer.draw_text(
             self.current_condition,
             current_x,
             condition_y,
-            font_size=10,
+            font_size=9,
             anchor="mm"
         )
 

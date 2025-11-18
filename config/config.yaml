@@ -46,8 +46,10 @@ widgets:
 
 # Widget-specific settings
 weather:
-  latitude: 40.7128  # New York City (change to your location)
+  zip_code: null  # US ZIP code (e.g., "10001") - overrides lat/long if set
+  latitude: 40.7128  # New York City (used if zip_code is null)
   longitude: -74.0060
+  location_name: null  # Auto-populated from geocoding
   units: fahrenheit  # fahrenheit or celsius
   show_forecast_days: 3
 

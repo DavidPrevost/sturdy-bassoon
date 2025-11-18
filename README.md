@@ -7,13 +7,24 @@ A modular, low-power dashboard for Raspberry Pi with e-ink touch display. Displa
 ### Current
 - **Clock Widget**: Current time and date
 - **Weather Widget**: Current conditions and 3-day forecast using Open-Meteo API
+  - **ZIP Code Support**: Enter location via 5-digit ZIP code
+  - **Touch Input**: Long-press anywhere to enter ZIP code via on-screen numpad
+  - Displays city name and current conditions
 - **Portfolio Widget**: Track stocks and cryptocurrency prices with % change
-- **Network Monitor**: Real-time bandwidth usage and network statistics (Phase 3)
+- **Network Monitor**: Real-time bandwidth usage and network statistics
   - Upload/download speeds
   - Total bytes sent/received
   - Auto-detects active network interface
+- **Web Dashboard**: Browser-based control panel for configuration
+  - Change weather location via ZIP code
+  - Manage portfolio watchlist (add/remove symbols)
+  - Adjust settings (refresh interval, units, etc.)
+  - No authentication - runs on local network
 - **Multi-screen Navigation**: Swipe between different dashboard screens
-- **Touch Support**: Framework for gesture-based navigation
+- **Touch Support**: Gesture-based navigation and input
+  - Swipe left/right for screen navigation
+  - Long-press for ZIP code input
+  - Touch numpad for data entry
 - **Configurable refresh**: Default 15-minute updates
 - **Low power**: E-ink display with minimal standby consumption
 - **Two display modes**: Multi-screen or single-screen layout
@@ -73,16 +84,31 @@ pip3 install -r requirements.txt
 
 ### 4. Configure Your Location
 
-Edit `config/config.yaml` and set your latitude/longitude:
+**Option 1: Use the Web Dashboard** (Easiest)
+```bash
+# Start the web dashboard
+python3 src/web/dashboard.py
+
+# Open in browser: http://localhost:5000
+# Enter your ZIP code and click Update Location
+```
+
+**Option 2: Edit config file directly**
+
+Edit `config/config.yaml`:
 
 ```yaml
 weather:
-  latitude: 40.7128   # Change to your latitude
-  longitude: -74.0060  # Change to your longitude
+  zip_code: "10001"  # Your 5-digit ZIP code
+  # OR use coordinates:
+  # latitude: 40.7128
+  # longitude: -74.0060
   units: fahrenheit    # or celsius
 ```
 
-You can find your coordinates at [latlong.net](https://www.latlong.net/)
+**Option 3: Use touch input** (When hardware is connected)
+- Long-press anywhere on the display
+- Enter ZIP code using on-screen numpad
 
 ## Usage
 
@@ -98,6 +124,26 @@ python3 src/main.py --once
 # Run with custom config
 python3 src/main.py --config /path/to/config.yaml
 ```
+
+### Run Web Dashboard
+
+The web dashboard provides an easy browser-based interface for managing settings:
+
+```bash
+# Start the web server
+python3 src/web/dashboard.py
+
+# Access at: http://localhost:5000
+# Or from another device: http://<pi-ip-address>:5000
+```
+
+Features:
+- Update weather location via ZIP code
+- Add/remove portfolio symbols
+- Adjust refresh interval and units
+- View current configuration
+
+See [WEB_DASHBOARD.md](WEB_DASHBOARD.md) for complete documentation.
 
 ### Run as System Service (Auto-start on Boot)
 

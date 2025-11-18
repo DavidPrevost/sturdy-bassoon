@@ -13,5 +13,8 @@ psutil>=5.9.0
 # Configuration
 PyYAML>=6.0
 
-# Optional: Stock data (for future portfolio widget)
+# Web dashboard
+Flask>=2.3.0
+
+# Stock data
 yfinance>=0.2.28

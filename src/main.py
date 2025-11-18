@@ -14,6 +14,7 @@ from src.utils.api_cache import APICache
 from src.display.driver import DisplayDriver
 from src.display.renderer import Renderer
 from src.display.screen_manager import ScreenManager, Screen
+from src.display.input_screen import InputMode
 from src.touch.handler import TouchHandler, Gesture
 from src.widgets.clock import ClockWidget
 from src.widgets.weather import WeatherWidget
@@ -61,6 +62,9 @@ class Dashboard:
             self.widgets = self._load_widgets()
             print(f"Single-screen mode: {len(self.widgets)} widgets")
             self.screen_manager = None
+
+        # Initialize input mode for touch-based user input
+        self.input_mode = InputMode()
 
         # Refresh settings
         self.refresh_interval = self.config.get_refresh_interval()
@@ -138,11 +142,72 @@ class Dashboard:
         """Handle touch gesture events."""
         print(f"Touch gesture: {event.gesture.value}")
 
+        # If input screen is active, let it handle the gesture
+        if self.input_mode.is_active():
+            if self.input_mode.handle_touch(event):
+                # Input complete or cancelled, re-render dashboard
+                self.render_dashboard(partial=True)
+            else:
+                # Still inputting, re-render input screen
+                self.render_dashboard(partial=True)
+            return
+
+        # Long press triggers ZIP code input for weather
+        if event.gesture == Gesture.LONG_PRESS:
+            self._trigger_zip_input()
+            return
+
         if self.multi_screen_mode and self.screen_manager:
             # Let screen manager handle navigation
             if self.screen_manager.handle_gesture(event):
                 # Screen changed, render immediately
                 self.render_dashboard(partial=True)
+
+    def _trigger_zip_input(self):
+        """Trigger ZIP code input screen."""
+        print("Triggering ZIP code input...")
+
+        def on_zip_submit(zip_code):
+            """Handle ZIP code submission."""
+            print(f"ZIP code submitted: {zip_code}")
+
+            # Find weather widget and update location
+            weather_widget = self._find_weather_widget()
+            if weather_widget:
+                if weather_widget.set_location_from_zip(zip_code):
+                    # Update config file
+                    self.config.config['weather']['zip_code'] = zip_code
+                    self.config.config['weather']['latitude'] = weather_widget.latitude
+                    self.config.config['weather']['longitude'] = weather_widget.longitude
+                    self.config.config['weather']['location_name'] = weather_widget.location_name
+
+                    # Save config
+                    import yaml
+                    with open(self.config.config_path, 'w') as f:
+                        yaml.safe_dump(self.config.config, f, default_flow_style=False, sort_keys=False)
+
+                    # Update weather data
+                    weather_widget.update_data()
+
+                    print(f"Weather location updated to {weather_widget.location_name}")
+                else:
+                    print(f"Failed to geocode ZIP: {zip_code}")
+
+        self.input_mode.show_numpad("Enter ZIP Code", 5, on_zip_submit)
+        self.render_dashboard(partial=True)
+
+    def _find_weather_widget(self):
+        """Find the weather widget in the current configuration."""
+        if self.multi_screen_mode and self.screen_manager:
+            for screen in self.screen_manager.screens:
+                for widget in screen.widgets:
+                    if isinstance(widget, WeatherWidget):
+                        return widget
+        elif self.widgets:
+            for widget in self.widgets:
+                if isinstance(widget, WeatherWidget):
+                    return widget
+        return None
 
     def update_widgets(self):
         """Update data for all widgets."""
@@ -193,6 +258,10 @@ class Dashboard:
 
                 except Exception as e:
                     print(f"Error rendering {widget.get_name()}: {e}")
+
+        # Render input screen overlay if active
+        if self.input_mode.is_active():
+            self.input_mode.render(self.renderer)
 
         # Display on e-ink screen
         image = self.renderer.get_image()
