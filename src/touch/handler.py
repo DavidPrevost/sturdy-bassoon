@@ -66,11 +66,24 @@ class TouchHandler:
         Initialize touch hardware for Waveshare 2.13" V4 display.
 
         The V4 uses a capacitive touch controller accessible via I2C.
-        Waveshare provides a TP (TouchPanel) module in their library.
+        IMPORTANT: The touch controller requires GPIO initialization (reset sequence)
+        before it will respond with touch data.
         """
         self.touch_driver = None
+        self.gpio_touch = None
 
-        # Try Waveshare's GT1151 module (most common for V4)
+        # Step 1: Initialize GPIO and reset touch controller
+        # This is CRITICAL - the touch controller won't report touches without this
+        try:
+            from src.touch.gpio_touch import TouchGPIO
+            self.gpio_touch = TouchGPIO()
+            self.gpio_touch.init()
+            print("✓ Touch controller GPIO initialized and reset")
+        except Exception as e:
+            print(f"Warning: GPIO touch init failed: {e}")
+            print("Touch controller may not respond without GPIO reset")
+
+        # Step 2: Try Waveshare's GT1151 module (most common for V4)
         try:
             from waveshare_epd import gt1151
             self.touch_driver = gt1151.GT1151()
@@ -322,6 +335,15 @@ class TouchHandler:
             if x_start <= x < x_end:
                 return i
         return num_zones - 1  # Default to last zone
+
+    def cleanup(self):
+        """Clean up GPIO and touch hardware resources."""
+        if self.gpio_touch:
+            try:
+                self.gpio_touch.cleanup()
+                print("Touch GPIO resources cleaned up")
+            except Exception as e:
+                print(f"Error cleaning up GPIO: {e}")
 
 
 class KeyboardTouchEmulator:

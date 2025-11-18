@@ -338,6 +338,11 @@ class Dashboard:
         """Clean shutdown."""
         print("Shutting down dashboard...")
         self.running = False
+
+        # Clean up touch handler GPIO resources
+        if self.touch_handler:
+            self.touch_handler.cleanup()
+
         self.display.sleep()
         print("Goodbye!")
 
