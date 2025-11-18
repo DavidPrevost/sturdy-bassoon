@@ -27,24 +27,33 @@ class ClockWidget(Widget):
         if self.current_time is None:
             self.update_data()
 
-        # Draw time (larger)
+        # Adjust font sizes based on available height
+        # For half-screen (61px), use smaller fonts to prevent overlap
+        if height < 80:
+            time_font = 16
+            date_font = 9
+        else:
+            time_font = 20
+            date_font = 11
+
+        # Draw time centered in upper portion of bounds
         time_y = y + height // 3
         renderer.draw_text(
             self.current_time,
             x + width // 2,
             time_y,
-            font_size=20,
+            font_size=time_font,
             bold=True,
             anchor="mm"
         )
 
-        # Draw date (smaller, below)
+        # Draw date centered in lower portion of bounds
         date_y = y + 2 * height // 3
         renderer.draw_text(
             self.current_date,
             x + width // 2,
             date_y,
-            font_size=11,
+            font_size=date_font,
             bold=False,
             anchor="mm"
         )

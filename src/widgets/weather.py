@@ -76,54 +76,67 @@ class WeatherWidget(Widget):
         return False
 
     def _fetch_weather(self) -> dict:
-        """Fetch weather from Open-Meteo API."""
-        try:
-            # Determine temperature unit
-            temp_unit = 'fahrenheit' if self.units == 'fahrenheit' else 'celsius'
+        """Fetch weather from Open-Meteo API with retry logic."""
+        max_retries = 3
+        retry_delay = 2
 
-            # Build API URL
-            url = "https://api.open-meteo.com/v1/forecast"
-            params = {
-                'latitude': self.latitude,
-                'longitude': self.longitude,
-                'current': ['temperature_2m', 'weather_code'],
-                'daily': ['temperature_2m_max', 'temperature_2m_min', 'weather_code'],
-                'temperature_unit': temp_unit,
-                'timezone': 'auto',
-                'forecast_days': self.forecast_days
-            }
+        for attempt in range(max_retries):
+            try:
+                # Determine temperature unit
+                temp_unit = 'fahrenheit' if self.units == 'fahrenheit' else 'celsius'
 
-            response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
+                # Build API URL
+                url = "https://api.open-meteo.com/v1/forecast"
+                params = {
+                    'latitude': self.latitude,
+                    'longitude': self.longitude,
+                    'current': ['temperature_2m', 'weather_code'],
+                    'daily': ['temperature_2m_max', 'temperature_2m_min', 'weather_code'],
+                    'temperature_unit': temp_unit,
+                    'timezone': 'auto',
+                    'forecast_days': self.forecast_days
+                }
 
-            # Parse current weather
-            self.current_temp = round(data['current']['temperature_2m'])
-            weather_code = data['current']['weather_code']
-            self.current_condition = self.WEATHER_CODES.get(weather_code, "Unknown")
+                response = requests.get(url, params=params, timeout=10)
+                response.raise_for_status()
+                data = response.json()
 
-            # Parse forecast
-            self.forecast = []
-            daily = data['daily']
-            for i in range(min(self.forecast_days, len(daily['time']))):
-                date = datetime.fromisoformat(daily['time'][i])
-                day_name = date.strftime("%a") if i > 0 else "Today"
-                high = round(daily['temperature_2m_max'][i])
-                low = round(daily['temperature_2m_min'][i])
-                code = daily['weather_code'][i]
-                condition = self.WEATHER_CODES.get(code, "Unknown")
+                # Parse current weather
+                self.current_temp = round(data['current']['temperature_2m'])
+                weather_code = data['current']['weather_code']
+                self.current_condition = self.WEATHER_CODES.get(weather_code, "Unknown")
 
-                self.forecast.append((day_name, high, low, condition))
+                # Parse forecast
+                self.forecast = []
+                daily = data['daily']
+                for i in range(min(self.forecast_days, len(daily['time']))):
+                    date = datetime.fromisoformat(daily['time'][i])
+                    day_name = date.strftime("%a") if i > 0 else "Today"
+                    high = round(daily['temperature_2m_max'][i])
+                    low = round(daily['temperature_2m_min'][i])
+                    code = daily['weather_code'][i]
+                    condition = self.WEATHER_CODES.get(code, "Unknown")
 
-            print(f"Weather updated: {self.current_temp}° {self.current_condition}")
-            return data
+                    self.forecast.append((day_name, high, low, condition))
 
-        except Exception as e:
-            print(f"Error fetching weather: {e}")
-            # Set fallback values
-            self.current_temp = self.current_temp or "--"
-            self.current_condition = self.current_condition or "Unavailable"
-            return None
+                print(f"✓ Weather updated: {self.current_temp}° {self.current_condition}")
+                return data
+
+            except requests.exceptions.RequestException as e:
+                print(f"Weather fetch attempt {attempt + 1}/{max_retries} failed: {e}")
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    print(f"✗ Weather fetch failed after {max_retries} attempts")
+                    # Keep existing data if available, don't overwrite with None
+                    return None
+            except Exception as e:
+                print(f"✗ Unexpected error fetching weather: {e}")
+                return None
+
+        return None
 
     def set_location_from_zip(self, zip_code: str) -> bool:
         """
@@ -160,11 +173,13 @@ class WeatherWidget(Widget):
     def get_location_display(self) -> str:
         """Get location string for display."""
         if self.location_name:
-            return self.location_name
+            # Show just the city name, truncate if too long
+            city = self.location_name.split(',')[0]  # Remove state/country
+            return city[:15]  # Limit to 15 chars
         elif self.zip_code:
-            return f"ZIP {self.zip_code}"
+            return self.zip_code
         else:
-            return f"{self.latitude:.2f}, {self.longitude:.2f}"
+            return "Weather"  # Generic label instead of coordinates
 
     def render(self, renderer: Renderer, bounds: tuple) -> None:
         """Render weather widget."""
@@ -220,31 +235,47 @@ class WeatherWidget(Widget):
         separator_x = x + left_width
         renderer.draw_vertical_line(separator_x, thickness=1)
 
-        # Draw forecast (right side)
+        # Draw forecast (right side) - compact layout
         if self.forecast:
-            forecast_x = x + left_width + 5
-            forecast_start_y = y + 10
-            line_height = (height - 20) // len(self.forecast)
+            forecast_x = x + left_width + 3
+            forecast_start_y = y + 8
+
+            # Calculate spacing - need room for day name + temp (about 16px per item)
+            available_height = height - 16
+            line_height = available_height // len(self.forecast)
 
             for i, (day, high, low, condition) in enumerate(self.forecast):
                 line_y = forecast_start_y + i * line_height
 
-                # Day name
-                renderer.draw_text(
-                    day,
-                    forecast_x,
-                    line_y,
-                    font_size=10,
-                    bold=True,
-                    anchor="lt"
-                )
+                # Day name and temp on same line if space is tight
+                if line_height < 16:
+                    # Ultra-compact: "Mon 45/32"
+                    compact_text = f"{day[:3]} {high}/{low}"
+                    renderer.draw_text(
+                        compact_text,
+                        forecast_x,
+                        line_y,
+                        font_size=8,
+                        bold=False,
+                        anchor="lt"
+                    )
+                else:
+                    # Two-line format
+                    renderer.draw_text(
+                        day[:3],  # Abbreviate day name
+                        forecast_x,
+                        line_y,
+                        font_size=8,
+                        bold=True,
+                        anchor="lt"
+                    )
 
-                # High/Low temps
-                temp_text = f"{high}°/{low}°"
-                renderer.draw_text(
-                    temp_text,
-                    forecast_x,
-                    line_y + 12,
-                    font_size=9,
-                    anchor="lt"
-                )
+                    # High/Low temps
+                    temp_text = f"{high}/{low}°"
+                    renderer.draw_text(
+                        temp_text,
+                        forecast_x,
+                        line_y + 9,
+                        font_size=8,
+                        anchor="lt"
+                    )
