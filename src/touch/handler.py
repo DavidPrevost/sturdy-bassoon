@@ -92,10 +92,11 @@ class TouchHandler:
         try:
             import smbus2
             self.i2c_bus = smbus2.SMBus(1)  # I2C bus 1 on Raspberry Pi
-            self.touch_i2c_addr = 0x5D  # GT1151 default address
+            # Waveshare 2.13" V4 uses address 0x14 (not the standard 0x5D)
+            self.touch_i2c_addr = 0x14
             # Test communication
             self.i2c_bus.read_byte(self.touch_i2c_addr)
-            print("✓ Touch hardware initialized (I2C direct)")
+            print("✓ Touch hardware initialized (I2C direct at 0x14)")
             return
         except Exception as e:
             print(f"I2C touch init failed: {e}")
@@ -164,9 +165,63 @@ class TouchHandler:
 
             # Alternative: Direct I2C reading (if using I2C fallback)
             elif hasattr(self, 'i2c_bus'):
-                # Basic I2C touch reading would go here
-                # This is complex and device-specific, so we'll skip for now
-                pass
+                # Read touch data from I2C controller (address 0x14)
+                # This controller (likely CST816S or similar) has touch data at specific registers
+                try:
+                    # Read touch status register
+                    # Register 0x02 typically contains number of touch points
+                    num_points = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x02)
+
+                    if num_points > 0:
+                        # Read touch coordinates
+                        # X position: registers 0x03-0x04 (high byte, low byte)
+                        # Y position: registers 0x05-0x06 (high byte, low byte)
+                        x_high = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x03)
+                        x_low = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x04)
+                        y_high = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x05)
+                        y_low = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x06)
+
+                        x = ((x_high & 0x0F) << 8) | x_low
+                        y = ((y_high & 0x0F) << 8) | y_low
+
+                        if self.touch_start is None:
+                            # New touch started
+                            self.touch_start = (x, y)
+                            self.touch_start_time = time.time()
+                            self.touch_current = (x, y)
+                        else:
+                            # Touch continuing - update current position
+                            self.touch_current = (x, y)
+
+                            # Check for long press
+                            duration = time.time() - self.touch_start_time
+                            if duration > self.long_press_duration and not self._long_press_fired:
+                                self._long_press_fired = True
+                                return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
+                    else:
+                        # No touch - check if touch was released
+                        if self.touch_start is not None:
+                            # Touch was released, detect gesture
+                            end_pos = self.touch_current or self.touch_start
+                            duration = time.time() - self.touch_start_time
+
+                            # Only detect gesture if long press wasn't already fired
+                            if not self._long_press_fired:
+                                gesture = self._detect_gesture(self.touch_start, end_pos, duration)
+                                event = TouchEvent(gesture, end_pos)
+                            else:
+                                event = None  # Long press already handled
+
+                            # Reset state
+                            self.touch_start = None
+                            self.touch_start_time = None
+                            self.touch_current = None
+                            self._long_press_fired = False
+
+                            return event
+                except:
+                    # I2C read error, skip this poll
+                    pass
 
         except Exception as e:
             # Don't spam errors, just return None
