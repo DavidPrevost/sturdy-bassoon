@@ -46,10 +46,11 @@ class DisplayDriver:
             return
 
         try:
+            # TP_lib requires update mode constant (FULL_UPDATE or PART_UPDATE)
             if full:
-                self.epd.init()
+                self.epd.init(self.epd.FULL_UPDATE)
             else:
-                self.epd.init_fast()  # Partial refresh mode
+                self.epd.init(self.epd.PART_UPDATE)
             self.epd.Clear(0xFF)
             self.initialized = True
             print("Display initialized successfully")
