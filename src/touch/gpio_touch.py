@@ -7,10 +7,11 @@ import time
 class TouchGPIO:
     """Handles GPIO initialization for capacitive touch controller."""
 
-    # Default GPIO pins for Waveshare 2.13" V4 touch
-    # These may vary - check your specific model
-    TP_RST_PIN = 13  # Touch panel reset pin
-    TP_INT_PIN = 17  # Touch panel interrupt pin
+    # GPIO pins for Waveshare 2.13" V4 touch (from their epdconfig.py)
+    # TRST (Touch Reset) = GPIO 22
+    # INT (Interrupt) = GPIO 27
+    TP_RST_PIN = 22  # Touch panel reset pin (TRST in Waveshare code)
+    TP_INT_PIN = 27  # Touch panel interrupt pin (INT in Waveshare code)
 
     def __init__(self, rst_pin=None, int_pin=None):
         """
