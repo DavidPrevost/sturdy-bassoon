@@ -45,8 +45,8 @@ TRST    = 22
 INT     = 27
 
 spi     = spidev.SpiDev(0, 0)
-address = 0x0
-# address = 0x14
+# address = 0x0
+address = 0x14  # GT1151 touch controller I2C address
 # address = 0x48
 bus     = SMBus(1)
 
