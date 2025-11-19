@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Optional
 from .base import Widget
 from src.display.renderer import Renderer
-from src.utils.geocoding import geocode_zip
 
 
 class WeatherCompactWidget(Widget):
@@ -15,8 +14,6 @@ class WeatherCompactWidget(Widget):
         self.latitude = config.get('weather.latitude', 40.7128)
         self.longitude = config.get('weather.longitude', -74.0060)
         self.units = config.get('weather.units', 'fahrenheit')
-        self.zip_code = config.get('weather.zip_code', None)
-        self.location_name = config.get('weather.location_name', None)
 
         # Weather data
         self.temperature = None
@@ -24,18 +21,6 @@ class WeatherCompactWidget(Widget):
         self.high = None
         self.low = None
         self.weather_code = None
-
-        # Geocode ZIP if provided
-        if self.zip_code and not self.location_name:
-            self._geocode_location()
-
-    def _geocode_location(self):
-        """Convert ZIP code to coordinates."""
-        result = geocode_zip(self.zip_code)
-        if result:
-            self.latitude = result['latitude']
-            self.longitude = result['longitude']
-            self.location_name = result['location_name']
 
     def update_data(self) -> bool:
         """Fetch current weather data."""
