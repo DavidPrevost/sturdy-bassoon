@@ -131,6 +131,9 @@ class TouchHandler:
                     self.GT_Dev.Touch = 1
                 else:
                     self.GT_Dev.Touch = 0
+                    # CRITICAL: Manually clear TouchpointFlag when no touch
+                    # GT_Scan doesn't clear it when GT_Dev.Touch == 0
+                    self.GT_Dev.TouchpointFlag = 0
 
                 # Scan for touch data
                 self.gt.GT_Scan(self.GT_Dev, self.GT_Old)
@@ -139,6 +142,10 @@ class TouchHandler:
                 if self.GT_Dev.TouchpointFlag:
                     # Touch is active - get coordinates
                     x, y = self.GT_Dev.X[0], self.GT_Dev.Y[0]
+
+                    # Filter out spurious (0,0) touches
+                    if x == 0 and y == 0:
+                        return None
 
                     if self.touch_start is None:
                         # New touch started
