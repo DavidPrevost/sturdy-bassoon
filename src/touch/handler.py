@@ -145,6 +145,7 @@ class TouchHandler:
                         self.touch_start = (x, y)
                         self.touch_start_time = time.time()
                         self.touch_current = (x, y)
+                        print(f"[TOUCH] Started at ({x}, {y})")
                     else:
                         # Touch continuing - update current position
                         self.touch_current = (x, y)
@@ -153,6 +154,7 @@ class TouchHandler:
                         duration = time.time() - self.touch_start_time
                         if duration > self.long_press_duration and not self._long_press_fired:
                             self._long_press_fired = True
+                            print(f"[TOUCH] Long press after {duration:.2f}s")
                             return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
                 else:
                     # Touch not active - check if it was just released
@@ -161,12 +163,16 @@ class TouchHandler:
                         end_pos = self.touch_current or self.touch_start
                         duration = time.time() - self.touch_start_time
 
+                        print(f"[TOUCH] Released: {self.touch_start} -> {end_pos}, {duration:.2f}s")
+
                         # Only detect gesture if long press wasn't already fired
                         if not self._long_press_fired:
                             gesture = self._detect_gesture(self.touch_start, end_pos, duration)
                             event = TouchEvent(gesture, end_pos)
+                            print(f"[TOUCH] Gesture: {gesture.value}")
                         else:
                             event = None  # Long press already handled
+                            print(f"[TOUCH] Skipped (long press already fired)")
 
                         # Reset state
                         self.touch_start = None
