@@ -349,7 +349,8 @@ class Dashboard:
                             print("Press Ctrl+C to exit")
                             self.last_status_print = current_time
 
-                        time.sleep(min(sleep_time, 1))  # Sleep in short chunks for touch responsiveness
+                        # Sleep in short chunks (0.05s) for responsive touch input
+                        time.sleep(min(sleep_time, 0.05))
                         continue
 
                 # Time for refresh
