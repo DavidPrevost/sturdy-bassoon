@@ -56,14 +56,15 @@ weather:
   show_forecast_days: 3
 
 portfolio:
+  finnhub_api_key: "d4f094hr01qrcbruo3h0d4f094hr01qrcbruo3hg"
   show_change: true  # Show percentage change
   symbols:
-    # Stocks (free via yfinance)
+    # Stocks (via Finnhub - 60 calls/min free tier)
     - AAPL
     - GOOGL
     - MSFT
     - TSLA
-    # Crypto (free via CoinGecko)
+    # Crypto (via CoinGecko - free, no key needed)
     - BTC-USD
     - ETH-USD
   # Examples of other symbols you can add:

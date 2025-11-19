@@ -13,6 +13,7 @@ class PortfolioWidget(Widget):
         super().__init__(config, cache)
         self.symbols = config.get('portfolio.symbols', [])
         self.show_change = config.get('portfolio.show_change', True)
+        self.finnhub_api_key = config.get('portfolio.finnhub_api_key', '')
         self.holdings = []  # List of (symbol, price, change_pct, type) tuples
 
     def update_data(self) -> bool:
@@ -119,31 +120,31 @@ class PortfolioWidget(Widget):
             return None
 
     def _fetch_stock_price(self, symbol: str) -> Optional[tuple]:
-        """Fetch stock price using yfinance."""
+        """Fetch stock price using Finnhub API."""
+        if not self.finnhub_api_key:
+            print(f"No Finnhub API key configured for {symbol}")
+            return None
+
         try:
-            import yfinance as yf
+            url = "https://finnhub.io/api/v1/quote"
+            params = {
+                'symbol': symbol.upper(),
+                'token': self.finnhub_api_key
+            }
 
-            ticker = yf.Ticker(symbol)
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
 
-            # Get current data
-            info = ticker.info
+            # Finnhub returns: c (current), d (change), dp (percent change),
+            # h (high), l (low), o (open), pc (previous close)
+            current_price = data.get('c', 0)
+            change_pct = data.get('dp', 0)  # dp is percent change
 
-            # Try to get current price
-            current_price = info.get('currentPrice') or info.get('regularMarketPrice')
-
-            if current_price is None:
-                # Fallback: get last close from history
-                hist = ticker.history(period='2d')
-                if not hist.empty:
-                    current_price = hist['Close'].iloc[-1]
-                    prev_price = hist['Close'].iloc[-2] if len(hist) > 1 else current_price
-                    change_pct = ((current_price - prev_price) / prev_price * 100) if prev_price else 0
-                else:
-                    return None
-            else:
-                # Calculate change percentage
-                prev_close = info.get('previousClose', current_price)
-                change_pct = ((current_price - prev_close) / prev_close * 100) if prev_close else 0
+            # Check if we got valid data (Finnhub returns 0 for invalid symbols)
+            if current_price == 0:
+                print(f"No data returned for {symbol}")
+                return None
 
             return (symbol, current_price, change_pct, 'stock')
 
