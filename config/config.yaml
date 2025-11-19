@@ -17,26 +17,44 @@ touch:
 refresh:
   interval_minutes: 5
   startup_full_refresh: true
+  clock_update_seconds: 60  # Update clock every 60 seconds
 
 # Multi-screen mode configuration
-# Each screen can contain one or more widgets
-# Swipe left/right to navigate between screens
 screens:
+  # Quadrant home screen - tap each quadrant to see detail
   - name: home
+    layout: quadrant
+    widgets:
+      - clock      # Upper left
+      - weather    # Upper right
+      - portfolio  # Lower left
+      - news       # Lower right
+    detail_screens:
+      - clock_detail
+      - weather_detail
+      - portfolio_detail
+      - news_detail
+
+  # Detail screens (full screen views)
+  - name: clock_detail
     widgets:
       - clock
+
+  - name: weather_detail
+    widgets:
       - weather
-  - name: portfolio
+
+  - name: portfolio_detail
     widgets:
       - portfolio
+
+  - name: news_detail
+    widgets:
+      - news
+
   - name: network
     widgets:
       - network
-
-# Legacy single-screen mode (used if multi_screen_mode: false)
-widgets:
-  - clock
-  - weather
 
 # Widget-specific settings
 weather:
@@ -50,15 +68,44 @@ weather:
 portfolio:
   finnhub_api_key: "d4f094hr01qrcbruo3h0d4f094hr01qrcbruo3hg"
   show_change: true
+  # Holdings with shares and cost basis (for portfolio summary)
+  holdings:
+    - symbol: AAPL
+      shares: 10
+      cost_basis: 150.00
+    - symbol: NVDA
+      shares: 5
+      cost_basis: 450.00
+    - symbol: CELH
+      shares: 20
+      cost_basis: 25.00
+    - symbol: NET
+      shares: 15
+      cost_basis: 80.00
+    - symbol: BTC-USD
+      shares: 0.1
+      cost_basis: 40000.00
+    - symbol: ETH-USD
+      shares: 1.0
+      cost_basis: 2500.00
+  # Legacy symbols list (for detail view)
   symbols:
-    # Stocks (via Finnhub - 60 calls/min free tier)
     - AAPL
     - NVDA
     - CELH
     - NET
-    # Crypto (via CoinGecko - free, no key needed)
     - BTC-USD
     - ETH-USD
+
+news:
+  max_headlines: 5
+  feeds:
+    - url: "https://feeds.bbci.co.uk/news/technology/rss.xml"
+      name: "BBC Tech"
+    - url: "https://news.ycombinator.com/rss"
+      name: "Hacker News"
+    - url: "https://feeds.finance.yahoo.com/rss/2.0/headline"
+      name: "Yahoo Finance"
 
 network:
   show_bandwidth: true

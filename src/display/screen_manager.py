@@ -1,5 +1,5 @@
 """Screen manager for multi-screen navigation."""
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from src.widgets.base import Widget
 from src.display.renderer import Renderer
 from src.touch.handler import TouchEvent, Gesture
@@ -47,6 +47,110 @@ class Screen:
 
             except Exception as e:
                 print(f"Error rendering {widget.get_name()} on {self.name}: {e}")
+
+    def get_tap_zone(self, position: Tuple[int, int]) -> Optional[int]:
+        """Get which widget zone was tapped. Returns widget index or None."""
+        return None  # Standard screens don't have tap zones
+
+
+class QuadrantScreen(Screen):
+    """
+    A screen with 4 quadrants in a 2x2 grid layout.
+
+    Layout:
+    +------------+------------+
+    | Upper Left | Upper Right|
+    | (widget 0) | (widget 1) |
+    +------------+------------+
+    | Lower Left | Lower Right|
+    | (widget 2) | (widget 3) |
+    +------------+------------+
+    """
+
+    def __init__(self, name: str, widgets: List[Widget], detail_screens: List[str] = None):
+        """
+        Initialize quadrant screen.
+
+        Args:
+            name: Screen name
+            widgets: List of exactly 4 widgets for each quadrant
+            detail_screens: List of screen names to navigate to when each quadrant is tapped
+        """
+        super().__init__(name, widgets)
+        self.detail_screens = detail_screens or [None, None, None, None]
+
+        if len(widgets) != 4:
+            print(f"Warning: QuadrantScreen expects 4 widgets, got {len(widgets)}")
+
+    def render(self, renderer: Renderer) -> None:
+        """Render widgets in 2x2 quadrant layout."""
+        if not self.widgets:
+            return
+
+        # Calculate quadrant dimensions
+        half_width = renderer.width // 2
+        half_height = renderer.height // 2
+
+        # Quadrant positions: (x, y, width, height)
+        quadrants = [
+            (0, 0, half_width, half_height),              # Upper left
+            (half_width, 0, half_width, half_height),     # Upper right
+            (0, half_height, half_width, half_height),    # Lower left
+            (half_width, half_height, half_width, half_height),  # Lower right
+        ]
+
+        # Render each widget in its quadrant
+        for i, widget in enumerate(self.widgets[:4]):
+            if widget is None:
+                continue
+
+            x, y, w, h = quadrants[i]
+            bounds = (x, y, w, h)
+
+            try:
+                widget.render(renderer, bounds)
+            except Exception as e:
+                print(f"Error rendering quadrant {i} on {self.name}: {e}")
+
+        # Draw dividing lines
+        # Vertical center line
+        renderer.draw_vertical_line(half_width, thickness=1)
+        # Horizontal center line
+        renderer.draw_horizontal_line(half_height, thickness=1)
+
+    def get_tap_zone(self, position: Tuple[int, int]) -> Optional[int]:
+        """
+        Get which quadrant was tapped.
+
+        Args:
+            position: (x, y) tap coordinates
+
+        Returns:
+            Quadrant index (0-3) or None
+        """
+        if position is None:
+            return None
+
+        x, y = position
+        half_width = 125  # 250 / 2
+        half_height = 61  # 122 / 2
+
+        if x < half_width:
+            if y < half_height:
+                return 0  # Upper left
+            else:
+                return 2  # Lower left
+        else:
+            if y < half_height:
+                return 1  # Upper right
+            else:
+                return 3  # Lower right
+
+    def get_detail_screen(self, quadrant: int) -> Optional[str]:
+        """Get the detail screen name for a quadrant."""
+        if 0 <= quadrant < len(self.detail_screens):
+            return self.detail_screens[quadrant]
+        return None
 
 
 class ScreenManager:

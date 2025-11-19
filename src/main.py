@@ -13,13 +13,17 @@ from src.utils.config import Config
 from src.utils.api_cache import APICache
 from src.display.driver import DisplayDriver
 from src.display.renderer import Renderer
-from src.display.screen_manager import ScreenManager, Screen
+from src.display.screen_manager import ScreenManager, Screen, QuadrantScreen
 from src.display.input_screen import InputMode
 from src.touch.handler import TouchHandler, Gesture
 from src.widgets.clock import ClockWidget
 from src.widgets.weather import WeatherWidget
 from src.widgets.portfolio import PortfolioWidget
 from src.widgets.network import NetworkWidget
+from src.widgets.clock_compact import ClockCompactWidget
+from src.widgets.weather_compact import WeatherCompactWidget
+from src.widgets.portfolio_summary import PortfolioSummaryWidget
+from src.widgets.news import NewsWidget
 
 
 class Dashboard:
@@ -96,10 +100,12 @@ class Dashboard:
 
         # Refresh settings
         self.refresh_interval = self.config.get_refresh_interval()
+        self.clock_update_interval = self.config.get('refresh.clock_update_seconds', 60)
         print(f"Refresh interval: {self.refresh_interval // 60} minutes")
 
         self.running = False
         self.last_refresh = None
+        self.last_clock_update = None
         self.last_status_print = 0  # Track when we last printed status
 
     def _load_widgets(self):
@@ -138,32 +144,62 @@ class Dashboard:
             enabled_widgets = self.config.get_enabled_widgets()
             screen_configs = [{'name': widget, 'widgets': [widget]} for widget in enabled_widgets]
 
-        # Widget registry
+        # Widget registry - standard full-screen widgets
         widget_classes = {
             'clock': ClockWidget,
             'weather': WeatherWidget,
             'portfolio': PortfolioWidget,
             'network': NetworkWidget,
+            'news': NewsWidget,
+        }
+
+        # Compact widget registry - for quadrant layouts
+        compact_widget_classes = {
+            'clock': ClockCompactWidget,
+            'weather': WeatherCompactWidget,
+            'portfolio': PortfolioSummaryWidget,
+            'news': NewsWidget,
         }
 
         for screen_config in screen_configs:
             screen_name = screen_config.get('name', 'Unnamed')
             widget_names = screen_config.get('widgets', [])
+            layout = screen_config.get('layout', 'standard')
+            detail_screens = screen_config.get('detail_screens', [])
 
             # Create widgets for this screen
             widgets = []
-            for widget_name in widget_names:
-                if widget_name in widget_classes:
-                    widget_class = widget_classes[widget_name]
-                    widget = widget_class(self.config, self.cache)
-                    widgets.append(widget)
-                else:
-                    print(f"  ✗ Unknown widget: {widget_name}")
 
-            if widgets:
-                screen = Screen(screen_name, widgets)
-                screen_manager.add_screen(screen)
-                print(f"  ✓ Created screen '{screen_name}' with {len(widgets)} widgets")
+            if layout == 'quadrant':
+                # Use compact widgets for quadrant layout
+                for widget_name in widget_names:
+                    if widget_name in compact_widget_classes:
+                        widget_class = compact_widget_classes[widget_name]
+                        widget = widget_class(self.config, self.cache)
+                        widgets.append(widget)
+                    else:
+                        print(f"  ✗ Unknown compact widget: {widget_name}")
+
+                if len(widgets) == 4:
+                    screen = QuadrantScreen(screen_name, widgets, detail_screens)
+                    screen_manager.add_screen(screen)
+                    print(f"  ✓ Created quadrant screen '{screen_name}' with 4 widgets")
+                else:
+                    print(f"  ✗ Quadrant screen needs exactly 4 widgets, got {len(widgets)}")
+            else:
+                # Standard layout
+                for widget_name in widget_names:
+                    if widget_name in widget_classes:
+                        widget_class = widget_classes[widget_name]
+                        widget = widget_class(self.config, self.cache)
+                        widgets.append(widget)
+                    else:
+                        print(f"  ✗ Unknown widget: {widget_name}")
+
+                if widgets:
+                    screen = Screen(screen_name, widgets)
+                    screen_manager.add_screen(screen)
+                    print(f"  ✓ Created screen '{screen_name}' with {len(widgets)} widgets")
 
         return screen_manager
 
@@ -179,17 +215,37 @@ class Dashboard:
                 self.render_dashboard(partial=True)
             return
 
-        # In multi-screen mode, let screen manager handle navigation
+        # In multi-screen mode, handle navigation
         if self.multi_screen_mode and self.screen_manager:
-            # All gestures navigate between screens
+            current_screen = self.screen_manager.get_current_screen()
+
+            # Check for quadrant tap on QuadrantScreen
+            if event.gesture == Gesture.TAP and isinstance(current_screen, QuadrantScreen):
+                quadrant = current_screen.get_tap_zone(event.position)
+                if quadrant is not None:
+                    detail_screen = current_screen.get_detail_screen(quadrant)
+                    if detail_screen:
+                        # Navigate to detail screen
+                        screen_idx = self._find_screen_index(detail_screen)
+                        if screen_idx is not None:
+                            self.screen_manager.go_to_screen(screen_idx)
+                            self.render_dashboard(partial=False)
+                            return
+
+            # Standard gesture handling (swipes, edge taps)
             if self.screen_manager.handle_gesture(event):
                 # Screen changed - use full refresh to avoid ghosting
                 self.render_dashboard(partial=False)
                 return
 
-        # Note: ZIP code input and other advanced features should be triggered
-        # from within specific widget screens (e.g., detailed weather view),
-        # not from the main dashboard navigation.
+    def _find_screen_index(self, screen_name: str):
+        """Find screen index by name."""
+        if not self.screen_manager:
+            return None
+        for i, screen in enumerate(self.screen_manager.screens):
+            if screen.name == screen_name:
+                return i
+        return None
 
     def _trigger_zip_input(self):
         """Trigger ZIP code input screen."""
@@ -326,20 +382,30 @@ class Dashboard:
 
             # Main loop
             while self.running:
+                current_time = time.time()
+
                 # Check for touch input (if enabled)
                 if self.touch_handler:
                     touch_event = self.touch_handler.poll()
                     if touch_event:
                         self._on_touch_gesture(touch_event)
 
-                # Calculate time until next refresh
+                # Check for clock update (every 60 seconds)
+                if self.last_clock_update:
+                    clock_elapsed = current_time - self.last_clock_update
+                    if clock_elapsed >= self.clock_update_interval:
+                        # Update clock display if on home screen with clock
+                        if self._should_update_clock():
+                            self.render_dashboard(partial=True)
+                        self.last_clock_update = current_time
+
+                # Calculate time until next full refresh
                 if self.last_refresh:
-                    elapsed = time.time() - self.last_refresh
+                    elapsed = current_time - self.last_refresh
                     sleep_time = self.refresh_interval - elapsed
 
                     if sleep_time > 0:
                         # Only print status every 60 seconds to avoid spam
-                        current_time = time.time()
                         if current_time - self.last_status_print >= 60:
                             print(f"\nNext update in {int(sleep_time // 60)} min {int(sleep_time % 60)} sec")
                             if self.multi_screen_mode:
@@ -351,8 +417,9 @@ class Dashboard:
                         time.sleep(min(sleep_time, 0.05))
                         continue
 
-                # Time for refresh
+                # Time for full refresh
                 self.run_once()
+                self.last_clock_update = current_time
 
         except KeyboardInterrupt:
             print("\n\nShutdown requested...")
@@ -361,6 +428,23 @@ class Dashboard:
             raise
         finally:
             self.shutdown()
+
+    def _should_update_clock(self):
+        """Check if we should update the clock (on home screen with clock visible)."""
+        if not self.multi_screen_mode or not self.screen_manager:
+            # Single screen mode - always update clock
+            return True
+
+        current_screen = self.screen_manager.get_current_screen()
+        if not current_screen:
+            return False
+
+        # Check if current screen has a clock widget
+        for widget in current_screen.widgets:
+            if isinstance(widget, (ClockWidget, ClockCompactWidget)):
+                return True
+
+        return False
 
     def shutdown(self):
         """Clean shutdown."""
