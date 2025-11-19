@@ -190,7 +190,7 @@
 
         .holding-item {
             display: grid;
-            grid-template-columns: 80px 80px 80px auto;
+            grid-template-columns: 30px 80px 80px 80px auto;
             gap: 10px;
             align-items: center;
             padding: 10px;
@@ -229,6 +229,31 @@
         .small-btn {
             padding: 6px 12px;
             font-size: 12px;
+        }
+
+        .order-btns {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .order-btn {
+            padding: 2px 6px;
+            font-size: 10px;
+            line-height: 1;
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .order-btn:hover {
+            background: #dee2e6;
+        }
+
+        .order-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
         }
     </style>
 </head>
@@ -285,7 +310,11 @@
 
             <div id="holdingsList">
                 {% for holding in config.portfolio.holdings %}
-                <div class="holding-item" data-symbol="{{ holding.symbol }}">
+                <div class="holding-item" data-symbol="{{ holding.symbol }}" data-index="{{ loop.index0 }}">
+                    <div class="order-btns">
+                        <button class="order-btn" onclick="moveHolding({{ loop.index0 }}, -1)" {% if loop.first %}disabled{% endif %}>▲</button>
+                        <button class="order-btn" onclick="moveHolding({{ loop.index0 }}, 1)" {% if loop.last %}disabled{% endif %}>▼</button>
+                    </div>
                     <span class="holding-symbol">{{ holding.symbol }}</span>
                     <input type="number" class="shares-input" value="{{ holding.shares }}" step="0.01" min="0" title="Shares">
                     <input type="number" class="cost-input" value="{{ holding.cost_basis }}" step="0.01" min="0" title="Cost/Share">
@@ -444,6 +473,45 @@
                     setTimeout(() => location.reload(), 1000);
                 } else {
                     showAlert('Failed to remove holding', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        async function moveHolding(index, direction) {
+            // Get current holdings from the DOM
+            const items = document.querySelectorAll('.holding-item');
+            const holdings = [];
+
+            items.forEach(item => {
+                holdings.push({
+                    symbol: item.dataset.symbol,
+                    shares: parseFloat(item.querySelector('.shares-input').value) || 0,
+                    cost_basis: parseFloat(item.querySelector('.cost-input').value) || 0
+                });
+            });
+
+            // Swap positions
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= holdings.length) return;
+
+            const temp = holdings[index];
+            holdings[index] = holdings[newIndex];
+            holdings[newIndex] = temp;
+
+            // Save new order
+            try {
+                const response = await fetch('/api/portfolio/holdings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ holdings })
+                });
+
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    showAlert('Failed to reorder', 'error');
                 }
             } catch (error) {
                 showAlert('Network error: ' + error.message, 'error');
