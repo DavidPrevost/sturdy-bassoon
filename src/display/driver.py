@@ -86,8 +86,12 @@ class DisplayDriver:
 
         try:
             if partial:
+                # Initialize for partial update if needed
+                self.epd.init(self.epd.PART_UPDATE)
                 self.epd.displayPartial(self.epd.getbuffer(image))
             else:
+                # Full refresh - reinitialize and clear to avoid ghosting
+                self.epd.init(self.epd.FULL_UPDATE)
                 self.epd.display(self.epd.getbuffer(image))
             print(f"Image displayed (partial={partial})")
         except Exception as e:

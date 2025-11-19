@@ -183,8 +183,8 @@ class Dashboard:
         if self.multi_screen_mode and self.screen_manager:
             # All gestures navigate between screens
             if self.screen_manager.handle_gesture(event):
-                # Screen changed, render immediately
-                self.render_dashboard(partial=True)
+                # Screen changed - use full refresh to avoid ghosting
+                self.render_dashboard(partial=False)
                 return
 
         # Note: ZIP code input and other advanced features should be triggered
