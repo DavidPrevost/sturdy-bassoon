@@ -181,16 +181,20 @@ class Dashboard:
                 self.render_dashboard(partial=True)
             return
 
+        # In multi-screen mode, let screen manager handle navigation first
+        if self.multi_screen_mode and self.screen_manager:
+            # Swipes and taps navigate between screens
+            if event.gesture in [Gesture.SWIPE_LEFT, Gesture.SWIPE_RIGHT, Gesture.TAP]:
+                if self.screen_manager.handle_gesture(event):
+                    # Screen changed, render immediately
+                    self.render_dashboard(partial=True)
+                    return
+
         # Long press triggers ZIP code input for weather
+        # (Only if not handled by screen navigation above)
         if event.gesture == Gesture.LONG_PRESS:
             self._trigger_zip_input()
             return
-
-        if self.multi_screen_mode and self.screen_manager:
-            # Let screen manager handle navigation
-            if self.screen_manager.handle_gesture(event):
-                # Screen changed, render immediately
-                self.render_dashboard(partial=True)
 
     def _trigger_zip_input(self):
         """Trigger ZIP code input screen."""
