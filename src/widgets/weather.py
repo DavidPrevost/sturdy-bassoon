@@ -185,6 +185,10 @@ class WeatherWidget(Widget):
         """Render weather widget."""
         x, y, width, height = bounds
 
+        # Ensure data is loaded on first render
+        if self.current_temp is None:
+            self.update_data()
+
         # Use temporary display values (don't permanently overwrite None)
         display_temp = self.current_temp if self.current_temp is not None else "--"
         display_condition = self.current_condition if self.current_condition is not None else "Unavailable"
@@ -199,18 +203,19 @@ class WeatherWidget(Widget):
         # Draw current weather (left side)
         current_x = x + left_width // 2
 
-        # Location name (larger, at top of left pane)
-        location_display = self.get_location_display()
-        renderer.draw_text(
-            str(location_display),
-            current_x,
-            y + 8,
-            font_size=11,
-            bold=True,
-            anchor="mm"
-        )
+        # City name (larger, at top of left pane)
+        if self.location_name:
+            city = self.location_name.split(',')[0]  # Remove state if present
+            renderer.draw_text(
+                city,
+                current_x,
+                y + 8,
+                font_size=11,
+                bold=True,
+                anchor="mm"
+            )
 
-        # ZIP code below location name
+        # ZIP code below city name
         if self.zip_code:
             renderer.draw_text(
                 self.zip_code,
@@ -260,46 +265,45 @@ class WeatherWidget(Widget):
         renderer.draw_vertical_line(separator_x, thickness=1)
 
         # Draw forecast (right side) - skip today, show tomorrow onwards
+        # 2-row format per day: Row1: Day + Hi/Lo, Row2: Date + Condition
         if self.forecast and len(self.forecast) > 1:
             forecast_x = x + left_width + 5
-            forecast_start_y = y + 6
+            forecast_start_y = y + 4
 
             # Skip today (index 0), show future days
             future_forecast = self.forecast[1:]
 
-            # Calculate spacing for larger text
-            available_height = height - 12
-            line_height = available_height // len(future_forecast)
+            # 2 rows per day, larger fonts
+            row_height = 14
 
-            for i, (day, high, low, condition) in enumerate(future_forecast):
-                line_y = forecast_start_y + i * line_height
+            for i, (day, high, low, condition) in enumerate(future_forecast[:4]):  # Max 4 days
+                base_y = forecast_start_y + i * (row_height * 2 + 2)
 
-                # Day name (bold, larger)
+                # Row 1: Day name and Hi/Lo
                 renderer.draw_text(
                     day[:3],
                     forecast_x,
-                    line_y,
-                    font_size=10,
+                    base_y,
+                    font_size=12,
                     bold=True,
                     anchor="lt"
                 )
 
-                # High/Low temps (larger)
                 temp_text = f"{high}/{low}°"
                 renderer.draw_text(
                     temp_text,
-                    forecast_x + 30,
-                    line_y,
-                    font_size=10,
+                    forecast_x + 55,
+                    base_y,
+                    font_size=12,
                     anchor="lt"
                 )
 
-                # Short condition (fits remaining space)
-                short_cond = condition[:8] if len(condition) > 8 else condition
+                # Row 2: Condition
+                short_cond = condition[:10] if len(condition) > 10 else condition
                 renderer.draw_text(
                     short_cond,
-                    forecast_x + 70,
-                    line_y,
-                    font_size=8,
+                    forecast_x,
+                    base_y + row_height,
+                    font_size=10,
                     anchor="lt"
                 )

@@ -54,15 +54,15 @@ screens:
 
 # Widget-specific settings
 weather:
-  zip_code: "01040"
-  latitude: 42.1987971
-  longitude: -72.6245512
-  location_name: "Holyoke"
+  zip_code: "10001"
+  latitude: 40.7128
+  longitude: -74.0060
+  location_name: "New York"
   units: fahrenheit
   show_forecast_days: 5
 
 portfolio:
-  finnhub_api_key: "d4f094hr01qrcbruo3h0d4f094hr01qrcbruo3hg"
+  finnhub_api_key: "YOUR_FINNHUB_API_KEY"
   show_change: true
   # Holdings with shares and cost basis (for portfolio summary)
   holdings:
@@ -100,8 +100,8 @@ news:
       name: "BBC Tech"
     - url: "https://news.ycombinator.com/rss"
       name: "Hacker News"
-    - url: "https://feeds.finance.yahoo.com/rss/2.0/headline"
-      name: "Yahoo Finance"
+    - url: "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
+      name: "NYT Business"
 
 network:
   show_bandwidth: true

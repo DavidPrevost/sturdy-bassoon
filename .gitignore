@@ -27,3 +27,6 @@ Thumbs.db
 
 # Testing
 .pytest_cache/
+
+# User config (use config.yaml.example as template)
+config/config.yaml

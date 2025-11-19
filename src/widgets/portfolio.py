@@ -15,6 +15,8 @@ class PortfolioWidget(Widget):
         self.show_change = config.get('portfolio.show_change', True)
         self.finnhub_api_key = config.get('portfolio.finnhub_api_key', '')
         self.holdings = []  # List of (symbol, price, change_pct, type) tuples
+        self.scroll_offset = 0  # For pagination
+        self.items_per_page = 4
 
     def update_data(self) -> bool:
         """Fetch current prices for all symbols."""
@@ -152,6 +154,21 @@ class PortfolioWidget(Widget):
             print(f"Error fetching stock {symbol}: {e}")
             return None
 
+    def scroll_up(self):
+        """Scroll up in the holdings list."""
+        if self.scroll_offset > 0:
+            self.scroll_offset -= 1
+            return True
+        return False
+
+    def scroll_down(self):
+        """Scroll down in the holdings list."""
+        max_offset = max(0, len(self.holdings) - self.items_per_page)
+        if self.scroll_offset < max_offset:
+            self.scroll_offset += 1
+            return True
+        return False
+
     def render(self, renderer: Renderer, bounds: tuple) -> None:
         """Render portfolio widget."""
         x, y, width, height = bounds
@@ -170,22 +187,30 @@ class PortfolioWidget(Widget):
             )
             return
 
-        # Title
-        renderer.draw_text("Portfolio", x + 5, y + 3, font_size=12, bold=True)
+        # Title with page indicator
+        total_pages = (len(self.holdings) + self.items_per_page - 1) // self.items_per_page
+        current_page = (self.scroll_offset // self.items_per_page) + 1
+        if total_pages > 1:
+            title_text = f"Portfolio ({current_page}/{total_pages})"
+        else:
+            title_text = "Portfolio"
+        renderer.draw_text(title_text, x + 5, y + 3, font_size=12, bold=True)
 
         # Calculate layout - larger row height for bigger fonts
         start_y = y + 18
         available_height = height - 22
-        max_visible = 4  # Show 4 holdings with larger fonts
-        line_height = available_height // max_visible
+        line_height = available_height // self.items_per_page
+
+        # Get visible holdings based on scroll offset
+        visible_holdings = self.holdings[self.scroll_offset:self.scroll_offset + self.items_per_page]
 
         # Draw each holding with alternating background
-        for i, holding in enumerate(self.holdings[:max_visible]):
+        for i, holding in enumerate(visible_holdings):
             symbol, price, change_pct, asset_type = holding
             line_y = start_y + i * line_height
 
             # Alternating row background (light gray for even rows)
-            if i % 2 == 0:
+            if (self.scroll_offset + i) % 2 == 0:
                 renderer.draw_rectangle(
                     x + 2, line_y - 2,
                     width - 4, line_height - 1,
@@ -233,13 +258,9 @@ class PortfolioWidget(Widget):
                     anchor="rt"
                 )
 
-        # Show scroll indicator if more holdings exist
-        if len(self.holdings) > max_visible:
-            more_count = len(self.holdings) - max_visible
-            renderer.draw_text(
-                f"+{more_count} more",
-                x + width // 2,
-                y + height - 3,
-                font_size=8,
-                anchor="mb"
-            )
+        # Show scroll hints if more holdings exist
+        if total_pages > 1:
+            if self.scroll_offset > 0:
+                renderer.draw_text("▲", x + width - 10, y + 3, font_size=8, anchor="rt")
+            if self.scroll_offset + self.items_per_page < len(self.holdings):
+                renderer.draw_text("▼", x + width - 10, y + height - 3, font_size=8, anchor="rb")

@@ -232,6 +232,19 @@ class Dashboard:
                             self.render_dashboard(partial=False)
                             return
 
+            # Handle swipe up/down for portfolio scrolling
+            if current_screen.name == 'portfolio_detail':
+                portfolio_widget = self._find_portfolio_widget()
+                if portfolio_widget:
+                    if event.gesture == Gesture.SWIPE_UP:
+                        if portfolio_widget.scroll_down():
+                            self.render_dashboard(partial=True)
+                            return
+                    elif event.gesture == Gesture.SWIPE_DOWN:
+                        if portfolio_widget.scroll_up():
+                            self.render_dashboard(partial=True)
+                            return
+
             # Standard gesture handling (swipes, edge taps)
             if self.screen_manager.handle_gesture(event):
                 # Screen changed - use full refresh to avoid ghosting
@@ -290,6 +303,19 @@ class Dashboard:
         elif self.widgets:
             for widget in self.widgets:
                 if isinstance(widget, WeatherWidget):
+                    return widget
+        return None
+
+    def _find_portfolio_widget(self):
+        """Find the portfolio widget in the current configuration."""
+        if self.multi_screen_mode and self.screen_manager:
+            for screen in self.screen_manager.screens:
+                for widget in screen.widgets:
+                    if isinstance(widget, PortfolioWidget):
+                        return widget
+        elif self.widgets:
+            for widget in self.widgets:
+                if isinstance(widget, PortfolioWidget):
                     return widget
         return None
 
