@@ -135,49 +135,46 @@ class TouchHandler:
                 # Scan for touch data
                 self.gt.GT_Scan(self.GT_Dev, self.GT_Old)
 
-                # Check if we have new touch data (position changed)
-                if (self.GT_Dev.X[0] != self.GT_Old.X[0] or
-                    self.GT_Dev.Y[0] != self.GT_Old.Y[0]):
+                # Check if touch is currently active (based on TouchpointFlag, not position)
+                if self.GT_Dev.TouchpointFlag:
+                    # Touch is active - get coordinates
+                    x, y = self.GT_Dev.X[0], self.GT_Dev.Y[0]
 
-                    if self.GT_Dev.TouchpointFlag:
-                        # New touch data available
-                        x, y = self.GT_Dev.X[0], self.GT_Dev.Y[0]
-
-                        if self.touch_start is None:
-                            # New touch started
-                            self.touch_start = (x, y)
-                            self.touch_start_time = time.time()
-                            self.touch_current = (x, y)
-                        else:
-                            # Touch continuing - update current position
-                            self.touch_current = (x, y)
-
-                            # Check for long press
-                            duration = time.time() - self.touch_start_time
-                            if duration > self.long_press_duration and not self._long_press_fired:
-                                self._long_press_fired = True
-                                return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
+                    if self.touch_start is None:
+                        # New touch started
+                        self.touch_start = (x, y)
+                        self.touch_start_time = time.time()
+                        self.touch_current = (x, y)
                     else:
-                        # Touch released
-                        if self.touch_start is not None:
-                            # Touch was released, detect gesture
-                            end_pos = self.touch_current or self.touch_start
-                            duration = time.time() - self.touch_start_time
+                        # Touch continuing - update current position
+                        self.touch_current = (x, y)
 
-                            # Only detect gesture if long press wasn't already fired
-                            if not self._long_press_fired:
-                                gesture = self._detect_gesture(self.touch_start, end_pos, duration)
-                                event = TouchEvent(gesture, end_pos)
-                            else:
-                                event = None  # Long press already handled
+                        # Check for long press
+                        duration = time.time() - self.touch_start_time
+                        if duration > self.long_press_duration and not self._long_press_fired:
+                            self._long_press_fired = True
+                            return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
+                else:
+                    # Touch not active - check if it was just released
+                    if self.touch_start is not None:
+                        # Touch was released, detect gesture
+                        end_pos = self.touch_current or self.touch_start
+                        duration = time.time() - self.touch_start_time
 
-                            # Reset state
-                            self.touch_start = None
-                            self.touch_start_time = None
-                            self.touch_current = None
-                            self._long_press_fired = False
+                        # Only detect gesture if long press wasn't already fired
+                        if not self._long_press_fired:
+                            gesture = self._detect_gesture(self.touch_start, end_pos, duration)
+                            event = TouchEvent(gesture, end_pos)
+                        else:
+                            event = None  # Long press already handled
 
-                            return event
+                        # Reset state
+                        self.touch_start = None
+                        self.touch_start_time = None
+                        self.touch_current = None
+                        self._long_press_fired = False
+
+                        return event
 
         except Exception as e:
             # Don't spam errors, just return None
