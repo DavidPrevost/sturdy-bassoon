@@ -25,6 +25,30 @@ from src.widgets.network import NetworkWidget
 class Dashboard:
     """Main dashboard application."""
 
+    def _init_waveshare_module(self):
+        """Initialize Waveshare GPIO module (shared by display and touch)."""
+        try:
+            # Add Waveshare library to path
+            repo_root = Path(__file__).parent.parent
+            waveshare_lib = repo_root / "python" / "lib"
+
+            if waveshare_lib.exists():
+                sys.path.insert(0, str(waveshare_lib))
+                from TP_lib import epdconfig
+
+                # Initialize module (GPIO, SPI, I2C)
+                epdconfig.module_init()
+                print("✓ Waveshare GPIO/module initialized")
+
+                # Store for cleanup later
+                self.epdconfig = epdconfig
+            else:
+                print("Waveshare library not found, skipping module init")
+                self.epdconfig = None
+        except Exception as e:
+            print(f"Warning: Could not initialize Waveshare module: {e}")
+            self.epdconfig = None
+
     def __init__(self, config_path=None):
         """Initialize the dashboard."""
         print("Initializing e-ink dashboard...")
@@ -32,6 +56,9 @@ class Dashboard:
         # Load configuration
         self.config = Config(config_path)
         print(f"Configuration loaded from {self.config.config_path}")
+
+        # Initialize Waveshare GPIO module (shared by display and touch)
+        self._init_waveshare_module()
 
         # Initialize cache
         self.cache = APICache()
@@ -45,7 +72,8 @@ class Dashboard:
         self.touch_enabled = self.config.get('touch.enabled', False)
         self.touch_handler = None
         if self.touch_enabled:
-            self.touch_handler = TouchHandler(width, height)
+            # Pass epdconfig to avoid re-initializing GPIO
+            self.touch_handler = TouchHandler(width, height, epdconfig=self.epdconfig)
             self.touch_handler.set_gesture_callback(self._on_touch_gesture)
             print("Touch input enabled")
 

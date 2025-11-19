@@ -36,10 +36,11 @@ class TouchHandler:
     will depend on the specific Waveshare display model and its driver.
     """
 
-    def __init__(self, width=250, height=122):
+    def __init__(self, width=250, height=122, epdconfig=None):
         self.width = width
         self.height = height
         self.simulation_mode = True  # Will be set based on hardware availability
+        self.epdconfig = epdconfig  # Pre-initialized epdconfig module (optional)
 
         # Touch detection parameters
         self.swipe_threshold = 30  # Minimum pixels for swipe
@@ -82,14 +83,21 @@ class TouchHandler:
         try:
             from TP_lib import gt1151, epdconfig
 
-            # Initialize the module (sets up SPI, I2C, GPIO)
-            epdconfig.module_init()
+            # Only initialize module if not already done
+            if self.epdconfig is None:
+                # Initialize the module (sets up SPI, I2C, GPIO)
+                epdconfig.module_init()
+                self.epdconfig = epdconfig
+                print("✓ Waveshare module initialized by touch handler")
+            else:
+                # Use pre-initialized epdconfig
+                epdconfig = self.epdconfig
+                print("✓ Using pre-initialized Waveshare module")
 
             # Create GT1151 touch controller instance
             self.gt = gt1151.GT1151()
             self.GT_Dev = gt1151.GT_Development()
             self.GT_Old = gt1151.GT_Development()
-            self.epdconfig = epdconfig
 
             # Initialize the touch controller (reset + version read)
             self.gt.GT_Init()
