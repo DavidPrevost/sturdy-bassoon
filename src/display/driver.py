@@ -1,17 +1,23 @@
 """E-ink display driver for Waveshare e-Paper HAT."""
 import time
+import sys
 from pathlib import Path
 from PIL import Image
 
 try:
-    # Try to import the Waveshare library
-    # This will need to be installed from Waveshare's repository
-    from waveshare_epd import epd2in13_V4
+    # Use TP_lib which shares GPIO with touch controller
+    # Add to path if not already there
+    repo_root = Path(__file__).parent.parent.parent
+    waveshare_lib = repo_root / "python" / "lib"
+    if str(waveshare_lib) not in sys.path:
+        sys.path.insert(0, str(waveshare_lib))
+
+    from TP_lib import epd2in13_V4
     DISPLAY_AVAILABLE = True
 except ImportError:
     # Fallback for development/testing without hardware
     DISPLAY_AVAILABLE = False
-    print("Warning: Waveshare e-paper library not found. Running in simulation mode.")
+    print("Warning: Waveshare TP_lib library not found. Running in simulation mode.")
 
 
 class DisplayDriver:
