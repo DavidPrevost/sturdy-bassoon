@@ -192,90 +192,114 @@ class WeatherWidget(Widget):
         # Determine unit symbol
         unit = "°F" if self.units == 'fahrenheit' else "°C"
 
-        # Draw location name at top
-        location_display = self.get_location_display()
-        renderer.draw_text(
-            str(location_display),
-            x + width // 2,
-            y + 3,
-            font_size=9,
-            anchor="mt"
-        )
-
         # Layout: Current weather on left, forecast on right
         left_width = width // 2
         right_width = width - left_width
 
         # Draw current weather (left side)
         current_x = x + left_width // 2
-        temp_y = y + height // 3 + 5  # Shift down to make room for location
 
-        # Temperature (large)
+        # Location name (larger, at top of left pane)
+        location_display = self.get_location_display()
+        renderer.draw_text(
+            str(location_display),
+            current_x,
+            y + 8,
+            font_size=11,
+            bold=True,
+            anchor="mm"
+        )
+
+        # ZIP code below location name
+        if self.zip_code:
+            renderer.draw_text(
+                self.zip_code,
+                current_x,
+                y + 22,
+                font_size=9,
+                anchor="mm"
+            )
+
+        # Temperature (large, centered)
+        temp_y = y + height // 2
         temp_text = f"{display_temp}{unit}"
         renderer.draw_text(
             temp_text,
             current_x,
             temp_y,
-            font_size=20,
+            font_size=18,
             bold=True,
             anchor="mm"
         )
 
         # Condition (below temperature)
-        condition_y = temp_y + 22
         renderer.draw_text(
             str(display_condition),
             current_x,
-            condition_y,
+            temp_y + 18,
             font_size=9,
             anchor="mm"
         )
+
+        # Today's Hi/Lo at bottom of left pane
+        if self.forecast:
+            today_high = self.forecast[0][1]
+            today_low = self.forecast[0][2]
+            hilo_text = f"H:{today_high}° L:{today_low}°"
+            renderer.draw_text(
+                hilo_text,
+                current_x,
+                y + height - 8,
+                font_size=9,
+                bold=True,
+                anchor="mm"
+            )
 
         # Draw vertical separator
         separator_x = x + left_width
         renderer.draw_vertical_line(separator_x, thickness=1)
 
-        # Draw forecast (right side) - compact layout
-        if self.forecast:
-            forecast_x = x + left_width + 3
-            forecast_start_y = y + 8
+        # Draw forecast (right side) - skip today, show tomorrow onwards
+        if self.forecast and len(self.forecast) > 1:
+            forecast_x = x + left_width + 5
+            forecast_start_y = y + 6
 
-            # Calculate spacing - need room for day name + temp (about 16px per item)
-            available_height = height - 16
-            line_height = available_height // len(self.forecast)
+            # Skip today (index 0), show future days
+            future_forecast = self.forecast[1:]
 
-            for i, (day, high, low, condition) in enumerate(self.forecast):
+            # Calculate spacing for larger text
+            available_height = height - 12
+            line_height = available_height // len(future_forecast)
+
+            for i, (day, high, low, condition) in enumerate(future_forecast):
                 line_y = forecast_start_y + i * line_height
 
-                # Day name and temp on same line if space is tight
-                if line_height < 16:
-                    # Ultra-compact: "Mon 45/32"
-                    compact_text = f"{day[:3]} {high}/{low}"
-                    renderer.draw_text(
-                        compact_text,
-                        forecast_x,
-                        line_y,
-                        font_size=8,
-                        bold=False,
-                        anchor="lt"
-                    )
-                else:
-                    # Two-line format
-                    renderer.draw_text(
-                        day[:3],  # Abbreviate day name
-                        forecast_x,
-                        line_y,
-                        font_size=8,
-                        bold=True,
-                        anchor="lt"
-                    )
+                # Day name (bold, larger)
+                renderer.draw_text(
+                    day[:3],
+                    forecast_x,
+                    line_y,
+                    font_size=10,
+                    bold=True,
+                    anchor="lt"
+                )
 
-                    # High/Low temps
-                    temp_text = f"{high}/{low}°"
-                    renderer.draw_text(
-                        temp_text,
-                        forecast_x,
-                        line_y + 9,
-                        font_size=8,
-                        anchor="lt"
-                    )
+                # High/Low temps (larger)
+                temp_text = f"{high}/{low}°"
+                renderer.draw_text(
+                    temp_text,
+                    forecast_x + 30,
+                    line_y,
+                    font_size=10,
+                    anchor="lt"
+                )
+
+                # Short condition (fits remaining space)
+                short_cond = condition[:8] if len(condition) > 8 else condition
+                renderer.draw_text(
+                    short_cond,
+                    forecast_x + 70,
+                    line_y,
+                    font_size=8,
+                    anchor="lt"
+                )

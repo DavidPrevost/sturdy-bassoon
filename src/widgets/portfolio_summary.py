@@ -33,6 +33,10 @@ class PortfolioSummaryWidget(Widget):
                 fetch_func=self._calculate_portfolio
             )
             if data:
+                # Restore values from cached data
+                self.total_value = data.get('total_value', 0.0)
+                self.daily_change = data.get('daily_change', 0.0)
+                self.daily_change_pct = data.get('daily_change_pct', 0.0)
                 self.last_update = datetime.now()
                 return True
             return False

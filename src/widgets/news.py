@@ -40,6 +40,8 @@ class NewsWidget(Widget):
                 fetch_func=self._fetch_headlines
             )
             if data:
+                # Restore headlines from cached data
+                self.headlines = data.get('headlines', [])
                 self.last_update = datetime.now()
                 return True
             return False

@@ -165,38 +165,45 @@ class PortfolioWidget(Widget):
                 "No portfolio data",
                 x + width // 2,
                 y + height // 2,
-                font_size=10,
+                font_size=12,
                 anchor="mm"
             )
             return
 
         # Title
-        renderer.draw_text("Portfolio", x + 5, y + 3, font_size=11, bold=True)
+        renderer.draw_text("Portfolio", x + 5, y + 3, font_size=12, bold=True)
 
-        # Calculate layout
+        # Calculate layout - larger row height for bigger fonts
         start_y = y + 18
-        available_height = height - 20
-        line_height = available_height // len(self.holdings)
-        line_height = min(line_height, 25)  # Cap line height
+        available_height = height - 22
+        max_visible = 4  # Show 4 holdings with larger fonts
+        line_height = available_height // max_visible
 
-        # Draw each holding
-        for i, holding in enumerate(self.holdings[:5]):  # Limit to 5 visible
+        # Draw each holding with alternating background
+        for i, holding in enumerate(self.holdings[:max_visible]):
             symbol, price, change_pct, asset_type = holding
             line_y = start_y + i * line_height
 
-            # Symbol (left)
+            # Alternating row background (light gray for even rows)
+            if i % 2 == 0:
+                renderer.draw_rectangle(
+                    x + 2, line_y - 2,
+                    width - 4, line_height - 1,
+                    fill=200  # Light gray
+                )
+
+            # Symbol (left column) - larger font
             renderer.draw_text(
                 symbol,
                 x + 5,
-                line_y,
-                font_size=10,
+                line_y + 2,
+                font_size=13,
                 bold=True,
                 anchor="lt"
             )
 
-            # Price (right side)
+            # Price (center column) - larger font
             if isinstance(price, (int, float)):
-                # Format price based on magnitude
                 if price < 1:
                     price_text = f"${price:.4f}"
                 elif price < 100:
@@ -206,27 +213,33 @@ class PortfolioWidget(Widget):
             else:
                 price_text = str(price)
 
-            # Get price text width to right-align
-            price_width, _ = renderer.get_text_size(price_text, font_size=10)
-            price_x = x + width - price_width - 5
-
             renderer.draw_text(
                 price_text,
-                price_x,
-                line_y,
-                font_size=10,
+                x + 75,
+                line_y + 2,
+                font_size=12,
                 anchor="lt"
             )
 
-            # Change percentage (below price, if enabled)
+            # Change percentage (right column) - larger font
             if self.show_change and isinstance(change_pct, (int, float)):
                 change_text = f"{change_pct:+.1f}%"
-                change_color = 0  # Black for e-ink
 
                 renderer.draw_text(
                     change_text,
-                    price_x,
-                    line_y + 11,
-                    font_size=8,
-                    anchor="lt"
+                    x + width - 5,
+                    line_y + 2,
+                    font_size=12,
+                    anchor="rt"
                 )
+
+        # Show scroll indicator if more holdings exist
+        if len(self.holdings) > max_visible:
+            more_count = len(self.holdings) - max_visible
+            renderer.draw_text(
+                f"+{more_count} more",
+                x + width // 2,
+                y + height - 3,
+                font_size=8,
+                anchor="mb"
+            )

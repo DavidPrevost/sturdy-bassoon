@@ -30,16 +30,12 @@ screens:
       - portfolio  # Lower left
       - news       # Lower right
     detail_screens:
-      - clock_detail
+      - null             # Clock tap does nothing (no detail screen)
       - weather_detail
       - portfolio_detail
       - news_detail
 
   # Detail screens (full screen views)
-  - name: clock_detail
-    widgets:
-      - clock
-
   - name: weather_detail
     widgets:
       - weather
@@ -61,9 +57,9 @@ weather:
   zip_code: "01040"
   latitude: 42.1987971
   longitude: -72.6245512
-  location_name: "01040"
+  location_name: "Holyoke"
   units: fahrenheit
-  show_forecast_days: 3
+  show_forecast_days: 5
 
 portfolio:
   finnhub_api_key: "d4f094hr01qrcbruo3h0d4f094hr01qrcbruo3hg"
