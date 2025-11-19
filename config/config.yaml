@@ -15,7 +15,7 @@ touch:
 
 # Update settings
 refresh:
-  interval_minutes: 15
+  interval_minutes: 5
   startup_full_refresh: true
 
 # Multi-screen mode configuration
@@ -32,50 +32,35 @@ screens:
   - name: network
     widgets:
       - network
-  # You can also combine widgets on one screen:
-  # - name: stats
-  #   widgets:
-  #     - network
-  #     - portfolio
 
 # Legacy single-screen mode (used if multi_screen_mode: false)
-# All widgets listed here will be displayed on one screen
 widgets:
   - clock
   - weather
 
 # Widget-specific settings
 weather:
-  # RECOMMENDED: Set your ZIP code for easier location management
-  # The dashboard will geocode it to lat/long and display your city name
-  zip_code: "10001"  # US ZIP code - set this to your location!
-  latitude: 40.7128  # Auto-updated from ZIP code geocoding
-  longitude: -74.0060  # Auto-updated from ZIP code geocoding
-  location_name: null  # Auto-populated from geocoding (e.g., "New York")
-  units: fahrenheit  # fahrenheit or celsius
+  zip_code: "01040"
+  latitude: 42.1987971
+  longitude: -72.6245512
+  location_name: "01040"
+  units: fahrenheit
   show_forecast_days: 3
 
 portfolio:
   finnhub_api_key: "d4f094hr01qrcbruo3h0d4f094hr01qrcbruo3hg"
-  show_change: true  # Show percentage change
+  show_change: true
   symbols:
     # Stocks (via Finnhub - 60 calls/min free tier)
     - AAPL
-    - GOOGL
-    - MSFT
-    - TSLA
+    - NVDA
+    - CELH
+    - NET
     # Crypto (via CoinGecko - free, no key needed)
     - BTC-USD
     - ETH-USD
-  # Examples of other symbols you can add:
-  # - AMZN
-  # - NVDA
-  # - META
-  # - SPY
-  # - SOL-USD
-  # - DOGE-USD
 
 network:
-  show_bandwidth: true     # Show upload/download speeds and totals
-  show_devices: false      # Show number of active connections (requires elevated permissions)
-  interface: null          # null = auto-detect, or specify: "wlan0", "eth0", etc.
+  show_bandwidth: true
+  show_devices: false
+  interface: null
