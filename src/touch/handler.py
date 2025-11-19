@@ -44,8 +44,8 @@ class TouchHandler:
 
         # Touch detection parameters
         self.swipe_threshold = 30  # Minimum pixels for swipe
-        self.long_press_duration = 1.0  # Seconds for long press
-        self.tap_timeout = 0.3  # Maximum duration for tap
+        self.long_press_duration = 2.0  # Seconds for long press (increased to prevent accidental triggers)
+        self.tap_timeout = 0.5  # Maximum duration for tap (increased)
 
         # Touch state
         self.touch_start = None
