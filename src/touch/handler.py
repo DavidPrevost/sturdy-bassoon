@@ -45,8 +45,8 @@ class TouchHandler:
 
         # Touch detection parameters
         self.swipe_threshold = 30  # Minimum pixels for swipe
-        self.long_press_duration = 2.0  # Seconds for long press (increased to prevent accidental triggers)
-        self.tap_timeout = 0.5  # Maximum duration for tap (increased)
+        self.long_press_duration = 2.0  # Seconds for long press
+        self.tap_timeout = 0.5  # Maximum duration for tap
 
         # Touch state
         self.touch_start = None
@@ -172,8 +172,7 @@ class TouchHandler:
                     self.GT_Dev.Touch = 1
                 else:
                     self.GT_Dev.Touch = 0
-                    # CRITICAL: Manually clear TouchpointFlag when no touch
-                    # GT_Scan doesn't clear it when GT_Dev.Touch == 0
+                    # Manually clear TouchpointFlag (GT_Scan doesn't clear it when Touch == 0)
                     self.GT_Dev.TouchpointFlag = 0
 
                 # Scan for touch data
@@ -196,7 +195,6 @@ class TouchHandler:
                         self.touch_start = (x, y)
                         self.touch_start_time = time.time()
                         self.touch_current = (x, y)
-                        print(f"[TOUCH] Started at ({x}, {y}) [raw: ({raw_x}, {raw_y})]")
                     else:
                         # Touch continuing - update current position
                         self.touch_current = (x, y)
@@ -205,7 +203,6 @@ class TouchHandler:
                         duration = time.time() - self.touch_start_time
                         if duration > self.long_press_duration and not self._long_press_fired:
                             self._long_press_fired = True
-                            print(f"[TOUCH] Long press after {duration:.2f}s")
                             return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
                 else:
                     # Touch not active - check if it was just released
@@ -214,16 +211,12 @@ class TouchHandler:
                         end_pos = self.touch_current or self.touch_start
                         duration = time.time() - self.touch_start_time
 
-                        print(f"[TOUCH] Released: {self.touch_start} -> {end_pos}, {duration:.2f}s")
-
                         # Only detect gesture if long press wasn't already fired
                         if not self._long_press_fired:
                             gesture = self._detect_gesture(self.touch_start, end_pos, duration)
                             event = TouchEvent(gesture, end_pos)
-                            print(f"[TOUCH] Gesture: {gesture.value}")
                         else:
                             event = None  # Long press already handled
-                            print(f"[TOUCH] Skipped (long press already fired)")
 
                         # Reset state
                         self.touch_start = None
@@ -248,7 +241,6 @@ class TouchHandler:
             position: Optional touch position
         """
         event = TouchEvent(gesture, position)
-        print(f"[SIMULATION] Touch gesture: {event}")
 
         if self.on_gesture:
             self.on_gesture(event)
@@ -338,46 +330,3 @@ class TouchHandler:
                 print("Touch hardware resources cleaned up")
             except Exception as e:
                 print(f"Error cleaning up touch hardware: {e}")
-
-
-class KeyboardTouchEmulator:
-    """
-    Keyboard-based touch emulator for testing without hardware.
-
-    Use arrow keys to simulate swipes, space for tap, etc.
-    """
-
-    def __init__(self, touch_handler: TouchHandler):
-        self.touch_handler = touch_handler
-        self.enabled = False
-
-    def enable(self):
-        """Enable keyboard emulation (requires keyboard library)."""
-        try:
-            import keyboard
-            self.enabled = True
-
-            # Bind keys
-            keyboard.on_press_key("left", lambda _: self.touch_handler.simulate_gesture(Gesture.SWIPE_LEFT))
-            keyboard.on_press_key("right", lambda _: self.touch_handler.simulate_gesture(Gesture.SWIPE_RIGHT))
-            keyboard.on_press_key("up", lambda _: self.touch_handler.simulate_gesture(Gesture.SWIPE_UP))
-            keyboard.on_press_key("down", lambda _: self.touch_handler.simulate_gesture(Gesture.SWIPE_DOWN))
-            keyboard.on_press_key("space", lambda _: self.touch_handler.simulate_gesture(Gesture.TAP, (125, 61)))
-
-            print("Keyboard touch emulation enabled:")
-            print("  Arrow keys = Swipe gestures")
-            print("  Space = Tap")
-
-        except ImportError:
-            print("keyboard library not available. Install with: pip install keyboard")
-            print("Note: May require root/admin privileges")
-
-    def disable(self):
-        """Disable keyboard emulation."""
-        if self.enabled:
-            try:
-                import keyboard
-                keyboard.unhook_all()
-                self.enabled = False
-            except:
-                pass

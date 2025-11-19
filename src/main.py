@@ -169,8 +169,6 @@ class Dashboard:
 
     def _on_touch_gesture(self, event):
         """Handle touch gesture events."""
-        print(f"Touch gesture: {event.gesture.value}")
-
         # If input screen is active, let it handle the gesture
         if self.input_mode.is_active():
             if self.input_mode.handle_touch(event):
