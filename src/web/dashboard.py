@@ -156,6 +156,118 @@ def remove_portfolio_symbol(symbol):
     return jsonify({'success': True, 'symbols': config['portfolio'].get('symbols', [])})
 
 
+@app.route('/api/portfolio/holdings', methods=['GET'])
+def get_portfolio_holdings():
+    """Get current portfolio holdings with shares and cost basis."""
+    config = load_config()
+    holdings = config.get('portfolio', {}).get('holdings', [])
+    return jsonify({'holdings': holdings})
+
+
+@app.route('/api/portfolio/holdings', methods=['POST'])
+def update_portfolio_holdings():
+    """Update all portfolio holdings."""
+    data = request.json
+    config = load_config()
+
+    if 'holdings' in data:
+        holdings = data['holdings']
+
+        if not isinstance(holdings, list):
+            return jsonify({'error': 'holdings must be a list'}), 400
+
+        # Validate each holding
+        for h in holdings:
+            if 'symbol' not in h:
+                return jsonify({'error': 'Each holding must have a symbol'}), 400
+            h['symbol'] = h['symbol'].upper().strip()
+            h['shares'] = float(h.get('shares', 0))
+            h['cost_basis'] = float(h.get('cost_basis', 0))
+
+        # Update config
+        if 'portfolio' not in config:
+            config['portfolio'] = {}
+
+        config['portfolio']['holdings'] = holdings
+
+        # Also update symbols list to match
+        config['portfolio']['symbols'] = [h['symbol'] for h in holdings]
+
+        save_config(config)
+
+        return jsonify({'success': True, 'holdings': holdings})
+
+    return jsonify({'error': 'Missing holdings'}), 400
+
+
+@app.route('/api/portfolio/holding', methods=['POST'])
+def add_portfolio_holding():
+    """Add or update a single holding."""
+    data = request.json
+    config = load_config()
+
+    if 'symbol' not in data:
+        return jsonify({'error': 'Missing symbol'}), 400
+
+    symbol = data['symbol'].upper().strip()
+    shares = float(data.get('shares', 0))
+    cost_basis = float(data.get('cost_basis', 0))
+
+    if not symbol:
+        return jsonify({'error': 'Invalid symbol'}), 400
+
+    # Initialize if needed
+    if 'portfolio' not in config:
+        config['portfolio'] = {}
+    if 'holdings' not in config['portfolio']:
+        config['portfolio']['holdings'] = []
+    if 'symbols' not in config['portfolio']:
+        config['portfolio']['symbols'] = []
+
+    # Check if symbol already exists
+    existing = None
+    for i, h in enumerate(config['portfolio']['holdings']):
+        if h['symbol'] == symbol:
+            existing = i
+            break
+
+    holding = {'symbol': symbol, 'shares': shares, 'cost_basis': cost_basis}
+
+    if existing is not None:
+        config['portfolio']['holdings'][existing] = holding
+    else:
+        config['portfolio']['holdings'].append(holding)
+        if symbol not in config['portfolio']['symbols']:
+            config['portfolio']['symbols'].append(symbol)
+
+    save_config(config)
+
+    return jsonify({'success': True, 'holdings': config['portfolio']['holdings']})
+
+
+@app.route('/api/portfolio/holding/<symbol>', methods=['DELETE'])
+def remove_portfolio_holding(symbol):
+    """Remove a holding from portfolio."""
+    config = load_config()
+    symbol = symbol.upper().strip()
+
+    if 'portfolio' in config:
+        # Remove from holdings
+        if 'holdings' in config['portfolio']:
+            config['portfolio']['holdings'] = [
+                h for h in config['portfolio']['holdings']
+                if h['symbol'] != symbol
+            ]
+
+        # Remove from symbols
+        if 'symbols' in config['portfolio'] and symbol in config['portfolio']['symbols']:
+            config['portfolio']['symbols'].remove(symbol)
+
+        save_config(config)
+
+    return jsonify({'success': True, 'holdings': config['portfolio'].get('holdings', [])})
+
+
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     """Update general settings."""

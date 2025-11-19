@@ -181,6 +181,55 @@
             grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+        }
+
+        .holding-item {
+            display: grid;
+            grid-template-columns: 80px 80px 80px auto;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            background: #f9f9f9;
+        }
+
+        .holding-item input {
+            padding: 6px;
+            font-size: 12px;
+        }
+
+        .holding-symbol {
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+        }
+
+        .add-holding-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: end;
+        }
+
+        .add-holding-form .form-group {
+            margin-bottom: 0;
+        }
+
+        .add-holding-form label {
+            font-size: 12px;
+        }
+
+        .small-btn {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -214,23 +263,39 @@
             <button onclick="updateWeatherLocation()">Update Location</button>
         </div>
 
-        <!-- Portfolio Settings -->
+        <!-- Portfolio Holdings -->
         <div class="card">
-            <h2>📈 Portfolio Watchlist</h2>
+            <h2>📈 Portfolio Holdings</h2>
 
-            <div class="add-symbol-form">
-                <input type="text" id="newSymbol" placeholder="Enter symbol (e.g., AAPL, BTC-USD)" maxlength="10">
-                <button onclick="addSymbol()">Add Symbol</button>
+            <div class="add-holding-form">
+                <div class="form-group">
+                    <label for="newSymbol">Symbol</label>
+                    <input type="text" id="newSymbol" placeholder="AAPL" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label for="newShares">Shares</label>
+                    <input type="number" id="newShares" placeholder="10" step="0.01" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="newCostBasis">Cost/Share</label>
+                    <input type="number" id="newCostBasis" placeholder="150.00" step="0.01" min="0">
+                </div>
+                <button onclick="addHolding()">Add</button>
             </div>
 
-            <ul class="symbol-list" id="symbolList">
-                {% for symbol in config.portfolio.symbols %}
-                <li class="symbol-item">
-                    <span class="symbol-name">{{ symbol }}</span>
-                    <button class="danger" onclick="removeSymbol('{{ symbol }}')">Remove</button>
-                </li>
+            <div id="holdingsList">
+                {% for holding in config.portfolio.holdings %}
+                <div class="holding-item" data-symbol="{{ holding.symbol }}">
+                    <span class="holding-symbol">{{ holding.symbol }}</span>
+                    <input type="number" class="shares-input" value="{{ holding.shares }}" step="0.01" min="0" title="Shares">
+                    <input type="number" class="cost-input" value="{{ holding.cost_basis }}" step="0.01" min="0" title="Cost/Share">
+                    <div>
+                        <button class="small-btn secondary" onclick="updateHolding('{{ holding.symbol }}', this)">Save</button>
+                        <button class="small-btn danger" onclick="removeHolding('{{ holding.symbol }}')">×</button>
+                    </div>
+                </div>
                 {% endfor %}
-            </ul>
+            </div>
         </div>
 
         <!-- General Settings -->
@@ -308,8 +373,10 @@
             }
         }
 
-        async function addSymbol() {
+        async function addHolding() {
             const symbol = document.getElementById('newSymbol').value.trim().toUpperCase();
+            const shares = parseFloat(document.getElementById('newShares').value) || 0;
+            const costBasis = parseFloat(document.getElementById('newCostBasis').value) || 0;
 
             if (!symbol) {
                 showAlert('Please enter a symbol', 'error');
@@ -317,42 +384,66 @@
             }
 
             try {
-                const response = await fetch('/api/portfolio/symbol', {
+                const response = await fetch('/api/portfolio/holding', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbol: symbol })
+                    body: JSON.stringify({ symbol, shares, cost_basis: costBasis })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    showAlert(`Added ${symbol} to watchlist!`, 'success');
+                    showAlert(`Added ${symbol} to portfolio!`, 'success');
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showAlert(data.error || 'Failed to add symbol', 'error');
+                    showAlert(data.error || 'Failed to add holding', 'error');
                 }
             } catch (error) {
                 showAlert('Network error: ' + error.message, 'error');
             }
         }
 
-        async function removeSymbol(symbol) {
-            if (!confirm(`Remove ${symbol} from watchlist?`)) {
+        async function updateHolding(symbol, btn) {
+            const row = btn.closest('.holding-item');
+            const shares = parseFloat(row.querySelector('.shares-input').value) || 0;
+            const costBasis = parseFloat(row.querySelector('.cost-input').value) || 0;
+
+            try {
+                const response = await fetch('/api/portfolio/holding', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol, shares, cost_basis: costBasis })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Updated ${symbol}`, 'success');
+                } else {
+                    showAlert(data.error || 'Failed to update holding', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        async function removeHolding(symbol) {
+            if (!confirm(`Remove ${symbol} from portfolio?`)) {
                 return;
             }
 
             try {
-                const response = await fetch(`/api/portfolio/symbol/${symbol}`, {
+                const response = await fetch(`/api/portfolio/holding/${symbol}`, {
                     method: 'DELETE'
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
-                    showAlert(`Removed ${symbol} from watchlist`, 'success');
+                    showAlert(`Removed ${symbol}`, 'success');
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showAlert('Failed to remove symbol', 'error');
+                    showAlert('Failed to remove holding', 'error');
                 }
             } catch (error) {
                 showAlert('Network error: ' + error.message, 'error');
@@ -391,7 +482,7 @@
         });
 
         document.getElementById('newSymbol').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') addSymbol();
+            if (e.key === 'Enter') addHolding();
         });
     </script>
 </body>
