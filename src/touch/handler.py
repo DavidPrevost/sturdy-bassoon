@@ -36,11 +36,12 @@ class TouchHandler:
     will depend on the specific Waveshare display model and its driver.
     """
 
-    def __init__(self, width=250, height=122, epdconfig=None):
+    def __init__(self, width=250, height=122, epdconfig=None, rotation=90):
         self.width = width
         self.height = height
         self.simulation_mode = True  # Will be set based on hardware availability
         self.epdconfig = epdconfig  # Pre-initialized epdconfig module (optional)
+        self.rotation = rotation  # Rotation in degrees (0, 90, 180, 270)
 
         # Touch detection parameters
         self.swipe_threshold = 30  # Minimum pixels for swipe
@@ -107,6 +108,46 @@ class TouchHandler:
         except Exception as e:
             raise RuntimeError(f"Failed to initialize Waveshare GT1151: {e}")
 
+    def _transform_coordinates(self, x: int, y: int) -> Tuple[int, int]:
+        """
+        Transform touch coordinates based on display rotation.
+
+        The touch sensor reports coordinates in portrait mode (122×250),
+        but the display is in landscape mode (250×122). This method
+        rotates the coordinates to match the display orientation.
+
+        Args:
+            x: Raw touch X coordinate (0-122 in portrait)
+            y: Raw touch Y coordinate (0-250 in portrait)
+
+        Returns:
+            (x, y) tuple in display coordinates
+        """
+        if self.rotation == 90:
+            # 90-degree clockwise rotation: portrait to landscape
+            # Touch sensor: 122 wide (X), 250 tall (Y)
+            # Display: 250 wide (X), 122 tall (Y)
+            touch_height = 250
+            new_x = touch_height - y
+            new_y = x
+            return (new_x, new_y)
+        elif self.rotation == 270:
+            # 270-degree clockwise (or 90 counter-clockwise)
+            touch_width = 122
+            new_x = y
+            new_y = touch_width - x
+            return (new_x, new_y)
+        elif self.rotation == 180:
+            # 180-degree rotation
+            touch_width = 122
+            touch_height = 250
+            new_x = touch_height - y
+            new_y = touch_width - x
+            return (new_x, new_y)
+        else:
+            # No rotation (0 degrees)
+            return (x, y)
+
     def set_gesture_callback(self, callback: Callable[[TouchEvent], None]):
         """Set callback function for gesture events."""
         self.on_gesture = callback
@@ -140,19 +181,22 @@ class TouchHandler:
 
                 # Check if touch is currently active (based on TouchpointFlag, not position)
                 if self.GT_Dev.TouchpointFlag:
-                    # Touch is active - get coordinates
-                    x, y = self.GT_Dev.X[0], self.GT_Dev.Y[0]
+                    # Touch is active - get raw coordinates
+                    raw_x, raw_y = self.GT_Dev.X[0], self.GT_Dev.Y[0]
 
                     # Filter out spurious (0,0) touches
-                    if x == 0 and y == 0:
+                    if raw_x == 0 and raw_y == 0:
                         return None
+
+                    # Transform coordinates to match display orientation
+                    x, y = self._transform_coordinates(raw_x, raw_y)
 
                     if self.touch_start is None:
                         # New touch started
                         self.touch_start = (x, y)
                         self.touch_start_time = time.time()
                         self.touch_current = (x, y)
-                        print(f"[TOUCH] Started at ({x}, {y})")
+                        print(f"[TOUCH] Started at ({x}, {y}) [raw: ({raw_x}, {raw_y})]")
                     else:
                         # Touch continuing - update current position
                         self.touch_current = (x, y)
