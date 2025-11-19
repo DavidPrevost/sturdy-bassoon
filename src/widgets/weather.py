@@ -46,8 +46,8 @@ class WeatherWidget(Widget):
         self.longitude = config.get('weather.longitude', -74.0060)
         self.location_name = config.get('weather.location_name', None)
 
-        # If ZIP code is provided, geocode it
-        if self.zip_code and Geocoder.validate_zip(self.zip_code):
+        # If ZIP code is provided but no location_name, geocode it
+        if self.zip_code and not self.location_name and Geocoder.validate_zip(self.zip_code):
             self.set_location_from_zip(self.zip_code)
 
         self.units = config.get('weather.units', 'fahrenheit')

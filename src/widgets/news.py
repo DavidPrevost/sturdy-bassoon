@@ -53,7 +53,7 @@ class NewsWidget(Widget):
 
         for feed_url, source_name in self.feeds:
             try:
-                response = requests.get(feed_url, timeout=10)
+                response = requests.get(feed_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
                 response.raise_for_status()
 
                 # Parse RSS XML
@@ -72,13 +72,18 @@ class NewsWidget(Widget):
                         if title:
                             self.headlines.append((title, source_name))
 
+                print(f"✓ Fetched {len(items[:3])} headlines from {source_name}")
+
             except Exception as e:
                 print(f"Error fetching {source_name}: {e}")
 
         # Limit total headlines
         self.headlines = self.headlines[:self.max_headlines]
 
-        return {'headlines': self.headlines}
+        # Only cache if we got some headlines
+        if self.headlines:
+            return {'headlines': self.headlines}
+        return None
 
     def render(self, renderer: Renderer, bounds: tuple) -> None:
         """Render news headlines."""

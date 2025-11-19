@@ -1,0 +1,14 @@
+[Unit]
+Description=E-ink Dashboard Display
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/hercules/sturdy-bassoon
+ExecStart=/usr/bin/python3 /home/hercules/sturdy-bassoon/src/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=E-ink Dashboard Web Interface
+After=network.target
+
+[Service]
+Type=simple
+User=hercules
+WorkingDirectory=/home/hercules/sturdy-bassoon
+ExecStart=/usr/bin/python3 /home/hercules/sturdy-bassoon/src/web/dashboard.py
+Restart=always
+RestartSec=10
+Environment=FLASK_ENV=production
+
+[Install]
+WantedBy=multi-user.target

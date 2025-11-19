@@ -238,11 +238,11 @@ class Dashboard:
                 if portfolio_widget:
                     if event.gesture == Gesture.SWIPE_UP:
                         if portfolio_widget.scroll_down():
-                            self.render_dashboard(partial=True)
+                            self.render_dashboard(partial=False)
                             return
                     elif event.gesture == Gesture.SWIPE_DOWN:
                         if portfolio_widget.scroll_up():
-                            self.render_dashboard(partial=True)
+                            self.render_dashboard(partial=False)
                             return
 
             # Standard gesture handling (swipes, edge taps)
