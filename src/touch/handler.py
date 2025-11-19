@@ -1,5 +1,7 @@
 """Touch input handler for the e-ink display."""
 import time
+import sys
+from pathlib import Path
 from typing import Optional, Callable, Tuple
 from enum import Enum
 
@@ -63,59 +65,39 @@ class TouchHandler:
 
     def _init_touch_hardware(self):
         """
-        Initialize touch hardware for Waveshare 2.13" V4 display.
+        Initialize touch hardware using Waveshare's GT1151 library.
 
-        The V4 uses a capacitive touch controller accessible via I2C.
-        IMPORTANT: The touch controller requires GPIO initialization (reset sequence)
-        before it will respond with touch data.
+        This uses the working library from python/lib/TP_lib instead of
+        reimplementing the touch detection.
         """
-        self.touch_driver = None
-        self.gpio_touch = None
+        # Add Waveshare's library to Python path
+        repo_root = Path(__file__).parent.parent.parent
+        waveshare_lib = repo_root / "python" / "lib"
 
-        # Step 1: Initialize GPIO and reset touch controller
-        # This is CRITICAL - the touch controller won't report touches without this
+        if not waveshare_lib.exists():
+            raise RuntimeError(f"Waveshare library not found at {waveshare_lib}")
+
+        sys.path.insert(0, str(waveshare_lib))
+
         try:
-            from src.touch.gpio_touch import TouchGPIO
-            self.gpio_touch = TouchGPIO()
-            self.gpio_touch.init()
-            print("✓ Touch controller GPIO initialized and reset")
+            from TP_lib import gt1151, epdconfig
+
+            # Initialize the module (sets up SPI, I2C, GPIO)
+            epdconfig.module_init()
+
+            # Create GT1151 touch controller instance
+            self.gt = gt1151.GT1151()
+            self.GT_Dev = gt1151.GT_Development()
+            self.GT_Old = gt1151.GT_Development()
+            self.epdconfig = epdconfig
+
+            # Initialize the touch controller (reset + version read)
+            self.gt.GT_Init()
+
+            print("✓ Touch hardware initialized (Waveshare GT1151)")
+
         except Exception as e:
-            print(f"Warning: GPIO touch init failed: {e}")
-            print("Touch controller may not respond without GPIO reset")
-
-        # Step 2: Try Waveshare's GT1151 module (most common for V4)
-        try:
-            from waveshare_epd import gt1151
-            self.touch_driver = gt1151.GT1151()
-            print("✓ Touch hardware initialized (GT1151)")
-            return
-        except (ImportError, Exception) as e:
-            print(f"GT1151 module not available: {e}")
-
-        # Try generic TP module
-        try:
-            from waveshare_epd import TP
-            self.touch_driver = TP.TP()
-            print("✓ Touch hardware initialized (TP module)")
-            return
-        except (ImportError, Exception) as e:
-            print(f"TP module not available: {e}")
-
-        # Try direct I2C access as fallback
-        try:
-            import smbus2
-            self.i2c_bus = smbus2.SMBus(1)  # I2C bus 1 on Raspberry Pi
-            # Waveshare 2.13" V4 uses address 0x14 (not the standard 0x5D)
-            self.touch_i2c_addr = 0x14
-            # Test communication
-            self.i2c_bus.read_byte(self.touch_i2c_addr)
-            print("✓ Touch hardware initialized (I2C direct at 0x14)")
-            return
-        except Exception as e:
-            print(f"I2C touch init failed: {e}")
-
-        # No hardware available
-        raise NotImplementedError("Touch hardware not available")
+            raise RuntimeError(f"Failed to initialize Waveshare GT1151: {e}")
 
     def set_gesture_callback(self, callback: Callable[[TouchEvent], None]):
         """Set callback function for gesture events."""
@@ -123,7 +105,7 @@ class TouchHandler:
 
     def poll(self) -> Optional[TouchEvent]:
         """
-        Poll for touch events from hardware.
+        Poll for touch events from hardware using Waveshare's GT1151 library.
 
         Returns:
             TouchEvent if a gesture was detected, None otherwise
@@ -132,109 +114,43 @@ class TouchHandler:
             return None
 
         try:
-            # Read touch data from Waveshare driver
-            if self.touch_driver and hasattr(self.touch_driver, 'scan'):
-                touch_data = self.touch_driver.scan()
-                if not touch_data:
-                    # No touch or touch released
-                    if self.touch_start is not None:
-                        # Touch was released, detect gesture
-                        end_pos = self.touch_current or self.touch_start
-                        duration = time.time() - self.touch_start_time
+            # Use Waveshare's GT1151 library
+            if hasattr(self, 'gt'):
+                # Check INT pin state
+                int_state = self.epdconfig.digital_read(self.gt.INT)
 
-                        # Only detect gesture if long press wasn't already fired
-                        if not self._long_press_fired:
-                            gesture = self._detect_gesture(self.touch_start, end_pos, duration)
-                            event = TouchEvent(gesture, end_pos)
-                        else:
-                            event = None  # Long press already handled
-
-                        # Reset state
-                        self.touch_start = None
-                        self.touch_start_time = None
-                        self.touch_current = None
-                        self._long_press_fired = False
-
-                        return event
-                    return None
-
-                # Touch detected - get first touch point
-                x, y = touch_data[0]  # Waveshare typically returns list of (x, y) tuples
-
-                if self.touch_start is None:
-                    # New touch started
-                    self.touch_start = (x, y)
-                    self.touch_start_time = time.time()
-                    self.touch_current = (x, y)
+                if int_state == 0:  # INT LOW = touch detected
+                    self.GT_Dev.Touch = 1
                 else:
-                    # Touch continuing - update current position
-                    self.touch_current = (x, y)
+                    self.GT_Dev.Touch = 0
 
-                    # Check for long press
-                    duration = time.time() - self.touch_start_time
-                    if duration > self.long_press_duration and not self._long_press_fired:
-                        self._long_press_fired = True
-                        return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
+                # Scan for touch data
+                self.gt.GT_Scan(self.GT_Dev, self.GT_Old)
 
-            # Alternative: GT1151 interrupt-based I2C reading
-            elif hasattr(self, 'i2c_bus') and self.gpio_touch:
-                # GT1151 uses interrupt-based touch detection
-                # Only read I2C when INT pin goes LOW
-                try:
-                    int_state = self.gpio_touch.read_int_pin()
+                # Check if we have new touch data (position changed)
+                if (self.GT_Dev.X[0] != self.GT_Old.X[0] or
+                    self.GT_Dev.Y[0] != self.GT_Old.Y[0]):
 
-                    if int_state == 0:  # INT pin LOW = touch detected
-                        # Read GT1151 status register (0x814E)
-                        status = self.i2c_bus.read_byte_data(self.touch_i2c_addr, 0x4E)
+                    if self.GT_Dev.TouchpointFlag:
+                        # New touch data available
+                        x, y = self.GT_Dev.X[0], self.GT_Dev.Y[0]
 
-                        # Check if valid touch data (bit 0x80 set)
-                        if status & 0x80:
-                            touch_count = status & 0x0F  # Lower 4 bits = number of touches
-
-                            if 1 <= touch_count <= 5:
-                                # Read touch data from 0x814F (8 bytes per touch)
-                                touch_data = self.i2c_bus.read_i2c_block_data(
-                                    self.touch_i2c_addr, 0x4F, touch_count * 8
-                                )
-
-                                # Clear status register to acknowledge touch
-                                self.i2c_bus.write_byte_data(self.touch_i2c_addr, 0x4E, 0x00)
-
-                                # Parse first touch point (bytes 0-7)
-                                # Byte 0: Track ID
-                                # Bytes 1-2: X coordinate (little endian)
-                                # Bytes 3-4: Y coordinate (little endian)
-                                # Bytes 5-6: Size/pressure
-                                x = (touch_data[2] << 8) | touch_data[1]
-                                y = (touch_data[4] << 8) | touch_data[3]
-
-                                if not hasattr(self, '_touch_debug_shown'):
-                                    print(f"✓ Touch detected! X={x}, Y={y}")
-                                    self._touch_debug_shown = True
-
-                                if self.touch_start is None:
-                                    # New touch started
-                                    self.touch_start = (x, y)
-                                    self.touch_start_time = time.time()
-                                    self.touch_current = (x, y)
-                                else:
-                                    # Touch continuing - update current position
-                                    self.touch_current = (x, y)
-
-                                    # Check for long press
-                                    duration = time.time() - self.touch_start_time
-                                    if duration > self.long_press_duration and not self._long_press_fired:
-                                        self._long_press_fired = True
-                                        return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
-                            else:
-                                # Invalid touch count
-                                self.i2c_bus.write_byte_data(self.touch_i2c_addr, 0x4E, 0x00)
+                        if self.touch_start is None:
+                            # New touch started
+                            self.touch_start = (x, y)
+                            self.touch_start_time = time.time()
+                            self.touch_current = (x, y)
                         else:
-                            # No valid touch data, clear status anyway
-                            self.i2c_bus.write_byte_data(self.touch_i2c_addr, 0x4E, 0x00)
+                            # Touch continuing - update current position
+                            self.touch_current = (x, y)
 
-                    else:  # INT pin HIGH = no touch
-                        # Check if touch was released
+                            # Check for long press
+                            duration = time.time() - self.touch_start_time
+                            if duration > self.long_press_duration and not self._long_press_fired:
+                                self._long_press_fired = True
+                                return TouchEvent(Gesture.LONG_PRESS, self.touch_start)
+                    else:
+                        # Touch released
                         if self.touch_start is not None:
                             # Touch was released, detect gesture
                             end_pos = self.touch_current or self.touch_start
@@ -254,12 +170,6 @@ class TouchHandler:
                             self._long_press_fired = False
 
                             return event
-                except Exception as e:
-                    # I2C read error, skip this poll
-                    if not hasattr(self, '_i2c_error_shown'):
-                        print(f"Touch I2C error: {e}")
-                        self._i2c_error_shown = True
-                    pass
 
         except Exception as e:
             # Don't spam errors, just return None
@@ -360,12 +270,12 @@ class TouchHandler:
 
     def cleanup(self):
         """Clean up GPIO and touch hardware resources."""
-        if self.gpio_touch:
+        if hasattr(self, 'epdconfig'):
             try:
-                self.gpio_touch.cleanup()
-                print("Touch GPIO resources cleaned up")
+                self.epdconfig.module_exit()
+                print("Touch hardware resources cleaned up")
             except Exception as e:
-                print(f"Error cleaning up GPIO: {e}")
+                print(f"Error cleaning up touch hardware: {e}")
 
 
 class KeyboardTouchEmulator:
