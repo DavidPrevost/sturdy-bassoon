@@ -29,6 +29,7 @@ class DisplayDriver:
         self.epd = None
         self.initialized = False
         self.simulation_mode = not DISPLAY_AVAILABLE
+        self._current_mode = None  # Track current update mode to avoid unnecessary reinit
 
         if DISPLAY_AVAILABLE:
             try:
@@ -86,12 +87,16 @@ class DisplayDriver:
 
         try:
             if partial:
-                # Initialize for partial update if needed
-                self.epd.init(self.epd.PART_UPDATE)
+                # Only reinitialize if switching from full to partial mode
+                if self._current_mode != 'partial':
+                    self.epd.init(self.epd.PART_UPDATE)
+                    self._current_mode = 'partial'
                 self.epd.displayPartial(self.epd.getbuffer(image))
             else:
-                # Full refresh - reinitialize and clear to avoid ghosting
-                self.epd.init(self.epd.FULL_UPDATE)
+                # Only reinitialize if switching from partial to full mode
+                if self._current_mode != 'full':
+                    self.epd.init(self.epd.FULL_UPDATE)
+                    self._current_mode = 'full'
                 self.epd.display(self.epd.getbuffer(image))
             print(f"Image displayed (partial={partial})")
         except Exception as e:
