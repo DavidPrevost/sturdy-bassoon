@@ -63,10 +63,25 @@ class WeatherCompactWidget(Widget):
                 fetch_func=self._fetch_weather
             )
             if data:
+                # Parse cached data into widget variables
+                self._parse_weather_data(data)
                 self.last_update = datetime.now()
                 return True
             return False
         return self._fetch_weather() is not None
+
+    def _parse_weather_data(self, data: dict) -> None:
+        """Parse weather API response into widget variables."""
+        current = data.get('current', {})
+        self.temperature = round(current.get('temperature_2m', 0))
+        self.weather_code = current.get('weather_code', 0)
+        self.condition = self._get_condition(self.weather_code)
+
+        daily = data.get('daily', {})
+        if daily.get('temperature_2m_max'):
+            self.high = round(daily['temperature_2m_max'][0])
+        if daily.get('temperature_2m_min'):
+            self.low = round(daily['temperature_2m_min'][0])
 
     def _fetch_weather(self) -> Optional[dict]:
         """Fetch weather from Open-Meteo API."""
