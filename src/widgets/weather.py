@@ -60,7 +60,7 @@ class WeatherWidget(Widget):
     def update_data(self) -> bool:
         """Fetch weather data from Open-Meteo API."""
         if self.cache is None:
-            return self._fetch_weather()
+            return self._fetch_weather() is not None
 
         # Cache for 10 minutes
         cache_key = f"weather_{self.latitude}_{self.longitude}"
@@ -71,9 +71,30 @@ class WeatherWidget(Widget):
         )
 
         if data:
+            # Parse cached data into widget variables
+            self._parse_weather_data(data)
             self.last_update = datetime.now()
             return True
         return False
+
+    def _parse_weather_data(self, data: dict) -> None:
+        """Parse weather API response into widget variables."""
+        # Parse current weather
+        self.current_temp = round(data['current']['temperature_2m'])
+        weather_code = data['current']['weather_code']
+        self.current_condition = self.WEATHER_CODES.get(weather_code, "Unknown")
+
+        # Parse forecast
+        self.forecast = []
+        daily = data['daily']
+        for i in range(min(self.forecast_days, len(daily['time']))):
+            date = datetime.fromisoformat(daily['time'][i])
+            day_name = date.strftime("%a") if i > 0 else "Today"
+            high = round(daily['temperature_2m_max'][i])
+            low = round(daily['temperature_2m_min'][i])
+            code = daily['weather_code'][i]
+            condition = self.WEATHER_CODES.get(code, "Unknown")
+            self.forecast.append((day_name, high, low, condition))
 
     def _fetch_weather(self) -> dict:
         """Fetch weather from Open-Meteo API with retry logic."""
