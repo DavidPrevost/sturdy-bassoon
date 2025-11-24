@@ -55,7 +55,8 @@ class WeatherCompactWidget(Widget):
     def update_data(self) -> bool:
         """Fetch current weather data."""
         if self.cache:
-            cache_key = f"weather_compact_{self.latitude}_{self.longitude}"
+            # Use same cache key as main weather widget to share data
+            cache_key = f"weather_{self.latitude}_{self.longitude}"
             data = self.cache.get(
                 cache_key,
                 ttl_seconds=600,

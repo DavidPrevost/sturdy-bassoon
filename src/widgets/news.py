@@ -10,11 +10,11 @@ from src.display.renderer import Renderer
 class NewsWidget(Widget):
     """News widget displaying headlines from RSS feeds."""
 
-    # Default RSS feeds
+    # Default RSS feeds (reliable, no auth required)
     DEFAULT_FEEDS = [
-        ('https://feeds.bbci.co.uk/news/world/rss.xml', 'BBC World'),
-        ('https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml', 'NY Times'),
-        ('https://feeds.npr.org/1001/rss.xml', 'NPR News'),
+        ('https://feeds.bbci.co.uk/news/rss.xml', 'BBC'),
+        ('https://www.reddit.com/r/news/.rss', 'Reddit'),
+        ('https://feeds.skynews.com/feeds/rss/world.xml', 'Sky News'),
     ]
 
     def __init__(self, config, cache=None):
