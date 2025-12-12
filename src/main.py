@@ -20,25 +20,27 @@ def _pre_cleanup_gpio():
 
     # First, kill any other dashboard processes that might be holding GPIO
     try:
-        # Get our own PID to avoid killing ourselves
+        # Get our own PID and parent PID to avoid killing ourselves
         our_pid = os.getpid()
+        our_ppid = os.getppid()
 
-        # Find other python processes running main.py
+        # Find other python processes running main.py (exclude grep itself)
         result = subprocess.run(
-            ['pgrep', '-f', 'python.*main.py'],
+            ['pgrep', '-f', 'src/main.py'],
             capture_output=True, text=True
         )
         if result.returncode == 0:
             for pid_str in result.stdout.strip().split('\n'):
                 if pid_str:
-                    pid = int(pid_str)
-                    if pid != our_pid:
-                        print(f"Killing old dashboard process (PID {pid})")
-                        try:
+                    try:
+                        pid = int(pid_str)
+                        # Skip our own process and parent (sudo)
+                        if pid != our_pid and pid != our_ppid:
+                            print(f"Killing old dashboard process (PID {pid})")
                             os.kill(pid, 15)  # SIGTERM = 15
-                            time_module.sleep(0.5)  # Give it time to cleanup
-                        except (ProcessLookupError, PermissionError):
-                            pass
+                            time_module.sleep(0.3)  # Give it time to cleanup
+                    except (ValueError, ProcessLookupError, PermissionError):
+                        pass
     except Exception:
         pass  # pgrep might not be available on all systems
 
