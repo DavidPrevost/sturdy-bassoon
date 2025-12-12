@@ -202,10 +202,10 @@ class NewsWidget(Widget):
 
         # Title
         renderer.draw_text(
-            "News Headlines",
+            "News",
             x + 5,
-            y + 3,
-            font_size=11,
+            y + 2,
+            font_size=10,
             bold=True
         )
 
@@ -219,23 +219,51 @@ class NewsWidget(Widget):
             )
             return
 
-        # Draw headlines
-        start_y = y + 20
-        line_height = 18
+        # Draw 4 headlines, 2 lines each
+        start_y = y + 16
+        block_height = (height - 16) // 4  # ~26px per headline block
 
-        for i, (title, source) in enumerate(self.headlines[:5]):
-            line_y = start_y + i * line_height
+        for i, (title, source) in enumerate(self.headlines[:4]):
+            block_y = start_y + i * block_height
 
-            # Truncate title
-            max_chars = 35
-            if len(title) > max_chars:
-                title = title[:max_chars-3] + "..."
+            # Word wrap title into 2 lines
+            # ~30 chars per line at font_size 10
+            chars_per_line = 32
 
-            # Draw bullet and title
-            renderer.draw_text(
-                f"• {title}",
-                x + 5,
-                line_y,
-                font_size=8,
-                anchor="lt"
-            )
+            if len(title) <= chars_per_line:
+                # Single line - center it vertically in block
+                renderer.draw_text(
+                    f"• {title}",
+                    x + 3,
+                    block_y + block_height // 2 - 5,
+                    font_size=10,
+                    anchor="lt"
+                )
+            else:
+                # Split into 2 lines at word boundary
+                split_point = title.rfind(' ', 0, chars_per_line)
+                if split_point < chars_per_line // 2:
+                    split_point = chars_per_line  # Force split if no good word boundary
+
+                line1 = title[:split_point].strip()
+                line2 = title[split_point:].strip()
+
+                # Truncate line2 if still too long
+                if len(line2) > chars_per_line - 2:
+                    line2 = line2[:chars_per_line - 5] + "..."
+
+                # Draw both lines
+                renderer.draw_text(
+                    f"• {line1}",
+                    x + 3,
+                    block_y,
+                    font_size=10,
+                    anchor="lt"
+                )
+                renderer.draw_text(
+                    f"  {line2}",
+                    x + 3,
+                    block_y + 12,
+                    font_size=10,
+                    anchor="lt"
+                )
