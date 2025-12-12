@@ -41,12 +41,10 @@ class Dashboard:
                 sys.path.insert(0, str(waveshare_lib))
                 from TP_lib import epdconfig
 
-                # Initialize module (GPIO, SPI, I2C)
-                epdconfig.module_init()
-                print("✓ Waveshare GPIO/module initialized")
-
-                # Store for cleanup later
+                # Don't call module_init() here - the display driver will do it
+                # Just store the reference for cleanup later
                 self.epdconfig = epdconfig
+                print("✓ Waveshare library loaded")
 
                 # Register atexit handler for cleanup on unexpected exit
                 atexit.register(self._cleanup_gpio)
