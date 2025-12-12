@@ -41,13 +41,6 @@ class Dashboard:
                 sys.path.insert(0, str(waveshare_lib))
                 from TP_lib import epdconfig
 
-                # Try to cleanup any existing GPIO from previous run
-                try:
-                    epdconfig.module_exit()
-                    print("Cleaned up existing GPIO resources")
-                except Exception:
-                    pass  # Ignore if nothing to clean up
-
                 # Initialize module (GPIO, SPI, I2C)
                 epdconfig.module_init()
                 print("✓ Waveshare GPIO/module initialized")
