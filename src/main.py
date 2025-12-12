@@ -14,37 +14,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # This MUST happen before importing display/touch modules which claim GPIO at import time
 def _pre_cleanup_gpio():
     """Clean up GPIO before imports (handles crashed previous runs)."""
-    import os
-    import subprocess
-    import time as time_module  # Local import to avoid issues
-
-    # First, kill any other dashboard processes that might be holding GPIO
-    try:
-        # Get our own PID and parent PID to avoid killing ourselves
-        our_pid = os.getpid()
-        our_ppid = os.getppid()
-
-        # Find other python processes running main.py (exclude grep itself)
-        result = subprocess.run(
-            ['pgrep', '-f', 'src/main.py'],
-            capture_output=True, text=True
-        )
-        if result.returncode == 0:
-            for pid_str in result.stdout.strip().split('\n'):
-                if pid_str:
-                    try:
-                        pid = int(pid_str)
-                        # Skip our own process and parent (sudo)
-                        if pid != our_pid and pid != our_ppid:
-                            print(f"Killing old dashboard process (PID {pid})")
-                            os.kill(pid, 15)  # SIGTERM = 15
-                            time_module.sleep(0.3)  # Give it time to cleanup
-                    except (ValueError, ProcessLookupError, PermissionError):
-                        pass
-    except Exception:
-        pass  # pgrep might not be available on all systems
-
-    # Now try to free GPIO pins
     try:
         import lgpio
         # GPIO pins used by Waveshare 2.13" display
@@ -59,13 +28,10 @@ def _pre_cleanup_gpio():
                 except lgpio.error:
                     pass  # Pin wasn't claimed by us
             lgpio.gpiochip_close(h)
-            print("GPIO cleanup completed")
-        except lgpio.error as e:
-            print(f"GPIO cleanup note: {e}")
+        except lgpio.error:
+            pass  # Chip not available or pins not claimed
     except ImportError:
         pass  # lgpio not available (not on Pi)
-    except Exception as e:
-        print(f"GPIO pre-cleanup warning: {e}")
 
 _pre_cleanup_gpio()
 
