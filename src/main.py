@@ -10,6 +10,63 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Pre-import GPIO cleanup: Release any GPIO pins left over from a crashed run
+# This MUST happen before importing display/touch modules which claim GPIO at import time
+def _pre_cleanup_gpio():
+    """Clean up GPIO before imports (handles crashed previous runs)."""
+    import os
+    import subprocess
+    import time as time_module  # Local import to avoid issues
+
+    # First, kill any other dashboard processes that might be holding GPIO
+    try:
+        # Get our own PID to avoid killing ourselves
+        our_pid = os.getpid()
+
+        # Find other python processes running main.py
+        result = subprocess.run(
+            ['pgrep', '-f', 'python.*main.py'],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            for pid_str in result.stdout.strip().split('\n'):
+                if pid_str:
+                    pid = int(pid_str)
+                    if pid != our_pid:
+                        print(f"Killing old dashboard process (PID {pid})")
+                        try:
+                            os.kill(pid, 15)  # SIGTERM = 15
+                            time_module.sleep(0.5)  # Give it time to cleanup
+                        except (ProcessLookupError, PermissionError):
+                            pass
+    except Exception:
+        pass  # pgrep might not be available on all systems
+
+    # Now try to free GPIO pins
+    try:
+        import lgpio
+        # GPIO pins used by Waveshare 2.13" display
+        # RST=17, DC=25, CS=8, BUSY=24, plus touch INT=4
+        pins_to_free = [17, 25, 8, 24, 4]
+
+        try:
+            h = lgpio.gpiochip_open(0)
+            for pin in pins_to_free:
+                try:
+                    lgpio.gpio_free(h, pin)
+                except lgpio.error:
+                    pass  # Pin wasn't claimed by us
+            lgpio.gpiochip_close(h)
+            print("GPIO cleanup completed")
+        except lgpio.error as e:
+            print(f"GPIO cleanup note: {e}")
+    except ImportError:
+        pass  # lgpio not available (not on Pi)
+    except Exception as e:
+        print(f"GPIO pre-cleanup warning: {e}")
+
+_pre_cleanup_gpio()
+
 from src.utils.config import Config
 from src.utils.api_cache import APICache
 from src.display.driver import DisplayDriver
