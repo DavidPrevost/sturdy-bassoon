@@ -10,80 +10,100 @@ from src.display.renderer import Renderer
 class NewsWidget(Widget):
     """News widget displaying headlines from RSS feeds."""
 
-    # Default RSS feeds
-    DEFAULT_FEEDS = [
-        ('https://feeds.bbci.co.uk/news/technology/rss.xml', 'BBC Tech'),
-        ('https://news.ycombinator.com/rss', 'Hacker News'),
-        ('https://feeds.finance.yahoo.com/rss/2.0/headline', 'Yahoo Finance'),
-    ]
+    # Simple, reliable RSS feed for testing
+    DEFAULT_FEED_URL = 'https://news.ycombinator.com/rss'
+    DEFAULT_FEED_NAME = 'Hacker News'
 
     def __init__(self, config, cache=None):
         super().__init__(config, cache)
-        # Handle both old tuple format and new dict format
-        feeds_config = config.get('news.feeds', self.DEFAULT_FEEDS)
-        if feeds_config and isinstance(feeds_config[0], dict):
-            # New format: list of dicts with url and name
-            self.feeds = [(f['url'], f['name']) for f in feeds_config]
-        else:
-            # Old format: list of tuples
-            self.feeds = feeds_config
+        self.feed_url = config.get('news.feed_url', self.DEFAULT_FEED_URL)
+        self.feed_name = config.get('news.feed_name', self.DEFAULT_FEED_NAME)
         self.max_headlines = config.get('news.max_headlines', 5)
         self.headlines = []  # List of (title, source) tuples
 
     def update_data(self) -> bool:
-        """Fetch headlines from RSS feeds."""
-        if self.cache:
-            cache_key = "news_headlines"
-            data = self.cache.get(
-                cache_key,
-                ttl_seconds=600,  # 10 minutes
-                fetch_func=self._fetch_headlines
-            )
-            if data:
-                # Restore headlines from cached data
-                self.headlines = data.get('headlines', [])
-                self.last_update = datetime.now()
-                return True
-            return False
-        return self._fetch_headlines() is not None
+        """Fetch headlines from RSS feed."""
+        print(f"[News] Fetching from {self.feed_url}...")
+
+        # Skip cache for now to debug
+        result = self._fetch_headlines()
+        if result:
+            self.last_update = datetime.now()
+            return True
+        return False
 
     def _fetch_headlines(self) -> Optional[dict]:
-        """Fetch headlines from all configured RSS feeds."""
+        """Fetch headlines from RSS feed."""
         self.headlines = []
 
-        for feed_url, source_name in self.feeds:
-            try:
-                response = requests.get(feed_url, timeout=10, headers={'User-Agent': 'Mozilla/5.0'})
-                response.raise_for_status()
+        try:
+            print(f"[News] Making request to {self.feed_url}")
+            response = requests.get(
+                self.feed_url,
+                timeout=15,
+                headers={
+                    'User-Agent': 'Mozilla/5.0 (compatible; EinkDashboard/1.0)',
+                    'Accept': 'application/rss+xml, application/xml, text/xml'
+                }
+            )
+            print(f"[News] Response status: {response.status_code}")
+            response.raise_for_status()
 
-                # Parse RSS XML
-                root = ET.fromstring(response.content)
+            # Debug: show first 500 chars of response
+            content = response.content
+            print(f"[News] Response length: {len(content)} bytes")
+            print(f"[News] First 200 chars: {content[:200]}")
 
-                # Find items (works for both RSS 2.0 and Atom)
-                items = root.findall('.//item') or root.findall('.//{http://www.w3.org/2005/Atom}entry')
+            # Parse RSS XML
+            root = ET.fromstring(content)
+            print(f"[News] XML root tag: {root.tag}")
 
-                for item in items[:3]:  # Get up to 3 from each feed
-                    # Try different title tag locations
-                    title_elem = item.find('title') or item.find('{http://www.w3.org/2005/Atom}title')
-                    if title_elem is not None and title_elem.text:
-                        title = title_elem.text.strip()
-                        # Clean up title
-                        title = title.replace('\n', ' ').strip()
-                        if title:
-                            self.headlines.append((title, source_name))
+            # Find items - try multiple methods
+            items = root.findall('.//item')
+            print(f"[News] Found {len(items)} items with .//item")
 
-                print(f"✓ Fetched {len(items[:3])} headlines from {source_name}")
+            if not items:
+                items = root.findall('.//{http://www.w3.org/2005/Atom}entry')
+                print(f"[News] Found {len(items)} items with Atom entry")
 
-            except Exception as e:
-                print(f"Error fetching {source_name}: {e}")
+            if not items:
+                # Debug: list all tags
+                all_tags = set()
+                for elem in root.iter():
+                    all_tags.add(elem.tag)
+                print(f"[News] All tags in XML: {all_tags}")
 
-        # Limit total headlines
-        self.headlines = self.headlines[:self.max_headlines]
+            for item in items[:self.max_headlines]:
+                title_elem = item.find('title')
+                if title_elem is None:
+                    title_elem = item.find('{http://www.w3.org/2005/Atom}title')
 
-        # Only cache if we got some headlines
-        if self.headlines:
-            return {'headlines': self.headlines}
-        return None
+                if title_elem is not None and title_elem.text:
+                    title = title_elem.text.strip().replace('\n', ' ')
+                    if title:
+                        self.headlines.append((title, self.feed_name))
+                        print(f"[News] Added headline: {title[:50]}...")
+
+            print(f"✓ News: Got {len(self.headlines)} headlines from {self.feed_name}")
+
+            if self.headlines:
+                return {'headlines': self.headlines}
+            return None
+
+        except requests.exceptions.Timeout:
+            print(f"✗ News: Request timed out for {self.feed_url}")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"✗ News: Request failed: {e}")
+            return None
+        except ET.ParseError as e:
+            print(f"✗ News: XML parse error: {e}")
+            return None
+        except Exception as e:
+            print(f"✗ News: Unexpected error: {type(e).__name__}: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def render(self, renderer: Renderer, bounds: tuple) -> None:
         """Render news headlines."""
