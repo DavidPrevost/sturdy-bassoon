@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Main application for the e-ink dashboard."""
-import atexit
 import time
 import signal
 import sys
@@ -41,28 +40,18 @@ class Dashboard:
                 sys.path.insert(0, str(waveshare_lib))
                 from TP_lib import epdconfig
 
-                # Don't call module_init() here - the display driver will do it
-                # Just store the reference for cleanup later
-                self.epdconfig = epdconfig
-                print("✓ Waveshare library loaded")
+                # Initialize module (GPIO, SPI, I2C)
+                epdconfig.module_init()
+                print("✓ Waveshare GPIO/module initialized")
 
-                # Register atexit handler for cleanup on unexpected exit
-                atexit.register(self._cleanup_gpio)
+                # Store for cleanup later
+                self.epdconfig = epdconfig
             else:
                 print("Waveshare library not found, skipping module init")
                 self.epdconfig = None
         except Exception as e:
             print(f"Warning: Could not initialize Waveshare module: {e}")
             self.epdconfig = None
-
-    def _cleanup_gpio(self):
-        """Clean up GPIO resources (called by atexit)."""
-        try:
-            if self.epdconfig:
-                self.epdconfig.module_exit()
-                print("GPIO resources released")
-        except Exception:
-            pass  # Ignore errors during cleanup
 
     def __init__(self, config_path=None):
         """Initialize the dashboard."""
@@ -493,14 +482,6 @@ class Dashboard:
             self.touch_handler.cleanup()
 
         self.display.sleep()
-
-        # Clean up GPIO and unregister atexit handler
-        try:
-            atexit.unregister(self._cleanup_gpio)
-        except Exception:
-            pass
-        self._cleanup_gpio()
-
         print("Goodbye!")
 
     def _signal_handler(self, signum, frame):
