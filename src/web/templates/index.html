@@ -280,12 +280,70 @@
                 {% endif %}
             </div>
 
-            <div class="form-group">
-                <label for="zipCode">ZIP Code</label>
-                <input type="text" id="zipCode" placeholder="Enter 5-digit ZIP code" maxlength="5">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label for="zipCode">ZIP Code</label>
+                    <input type="text" id="zipCode" placeholder="Enter 5-digit ZIP code" maxlength="5">
+                </div>
+                <div class="form-group">
+                    <label for="forecastDays">Forecast Days</label>
+                    <select id="forecastDays">
+                        {% for i in range(1, 8) %}
+                        <option value="{{ i }}" {% if config.weather.get('show_forecast_days', 5) == i %}selected{% endif %}>{{ i }} day{{ 's' if i > 1 else '' }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
 
             <button onclick="updateWeatherLocation()">Update Location</button>
+        </div>
+
+        <!-- News Settings -->
+        <div class="card">
+            <h2>📰 News Settings</h2>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label for="maxHeadlines">Number of Headlines</label>
+                    <select id="maxHeadlines">
+                        {% for i in range(1, 11) %}
+                        <option value="{{ i }}" {% if config.news.get('max_headlines', 5) == i %}selected{% endif %}>{{ i }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="feedName">Feed Name</label>
+                    <input type="text" id="feedName" value="{{ config.news.get('feed_name', 'Hacker News') }}" placeholder="Feed display name">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="feedUrl">RSS Feed URL</label>
+                <input type="text" id="feedUrl" value="{{ config.news.get('feed_url', 'https://news.ycombinator.com/rss') }}" placeholder="https://example.com/rss">
+            </div>
+
+            <button onclick="updateNewsSettings()">Save News Settings</button>
+
+            <h3 style="margin-top: 20px; font-size: 14px; color: #666;">Additional Feeds</h3>
+            <p style="font-size: 12px; color: #888; margin-bottom: 10px;">Add multiple RSS feeds (future feature - will rotate between feeds)</p>
+
+            <div class="add-feed-form" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <input type="text" id="newFeedName" placeholder="Feed Name" style="flex: 1;">
+                <input type="text" id="newFeedUrl" placeholder="RSS URL" style="flex: 2;">
+                <button class="small-btn" onclick="addFeed()">Add</button>
+            </div>
+
+            <div id="feedsList">
+                {% for feed in config.news.get('feeds', []) %}
+                <div class="feed-item" data-url="{{ feed.url }}" style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: #f9f9f9; border: 1px solid #eee; border-radius: 4px; margin-bottom: 6px;">
+                    <div>
+                        <strong>{{ feed.name }}</strong>
+                        <span style="color: #888; font-size: 12px; display: block;">{{ feed.url[:50] }}{% if feed.url|length > 50 %}...{% endif %}</span>
+                    </div>
+                    <button class="small-btn danger" onclick="removeFeed('{{ feed.url }}')">×</button>
+                </div>
+                {% endfor %}
+            </div>
         </div>
 
         <!-- Portfolio Holdings -->
@@ -331,9 +389,20 @@
         <div class="card">
             <h2>⚙️ General Settings</h2>
 
-            <div class="form-group">
-                <label for="refreshInterval">Refresh Interval (minutes)</label>
-                <input type="number" id="refreshInterval" value="{{ config.refresh.interval_minutes }}" min="1" max="60">
+            <div class="grid-2">
+                <div class="form-group">
+                    <label for="refreshInterval">Data Refresh (minutes)</label>
+                    <input type="number" id="refreshInterval" value="{{ config.refresh.interval_minutes }}" min="1" max="60">
+                </div>
+                <div class="form-group">
+                    <label for="clockUpdateSeconds">Clock Update (seconds)</label>
+                    <select id="clockUpdateSeconds">
+                        <option value="30" {% if config.refresh.get('clock_update_seconds', 60) == 30 %}selected{% endif %}>30 sec</option>
+                        <option value="60" {% if config.refresh.get('clock_update_seconds', 60) == 60 %}selected{% endif %}>1 min</option>
+                        <option value="120" {% if config.refresh.get('clock_update_seconds', 60) == 120 %}selected{% endif %}>2 min</option>
+                        <option value="300" {% if config.refresh.get('clock_update_seconds', 60) == 300 %}selected{% endif %}>5 min</option>
+                    </select>
+                </div>
             </div>
 
             <div class="form-group">
@@ -521,7 +590,9 @@
         async function updateSettings() {
             const settings = {
                 refresh_interval: parseInt(document.getElementById('refreshInterval').value),
+                clock_update_seconds: parseInt(document.getElementById('clockUpdateSeconds').value),
                 weather_units: document.getElementById('weatherUnits').value,
+                weather_forecast_days: parseInt(document.getElementById('forecastDays').value),
                 network_show_bandwidth: document.getElementById('networkBandwidth').checked
             };
 
@@ -538,6 +609,84 @@
                     showAlert('Settings updated successfully!', 'success');
                 } else {
                     showAlert(data.error || 'Failed to update settings', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        async function updateNewsSettings() {
+            const settings = {
+                max_headlines: parseInt(document.getElementById('maxHeadlines').value),
+                feed_url: document.getElementById('feedUrl').value.trim(),
+                feed_name: document.getElementById('feedName').value.trim()
+            };
+
+            try {
+                const response = await fetch('/api/news/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('News settings updated!', 'success');
+                } else {
+                    showAlert(data.error || 'Failed to update news settings', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        async function addFeed() {
+            const name = document.getElementById('newFeedName').value.trim();
+            const url = document.getElementById('newFeedUrl').value.trim();
+
+            if (!name || !url) {
+                showAlert('Please enter both feed name and URL', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/news/feed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, url })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert(`Added feed: ${name}`, 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert(data.error || 'Failed to add feed', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error: ' + error.message, 'error');
+            }
+        }
+
+        async function removeFeed(url) {
+            if (!confirm('Remove this feed?')) return;
+
+            try {
+                const response = await fetch('/api/news/feed', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showAlert('Feed removed', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showAlert('Failed to remove feed', 'error');
                 }
             } catch (error) {
                 showAlert('Network error: ' + error.message, 'error');
