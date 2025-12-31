@@ -10,9 +10,9 @@ from src.display.renderer import Renderer
 class NewsWidget(Widget):
     """News widget displaying headlines from RSS feeds."""
 
-    # Simple, reliable RSS feed for testing
-    DEFAULT_FEED_URL = 'https://news.ycombinator.com/rss'
-    DEFAULT_FEED_NAME = 'Hacker News'
+    # Default RSS feed - BBC World News
+    DEFAULT_FEED_URL = 'https://feeds.bbci.co.uk/news/world/rss.xml'
+    DEFAULT_FEED_NAME = 'BBC World'
 
     def __init__(self, config, cache=None):
         super().__init__(config, cache)

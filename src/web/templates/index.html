@@ -313,13 +313,13 @@
                 </div>
                 <div class="form-group">
                     <label for="feedName">Feed Name</label>
-                    <input type="text" id="feedName" value="{{ config.news.get('feed_name', 'Hacker News') }}" placeholder="Feed display name">
+                    <input type="text" id="feedName" value="{{ config.news.get('feed_name', 'BBC World') }}" placeholder="Feed display name">
                 </div>
             </div>
 
             <div class="form-group">
                 <label for="feedUrl">RSS Feed URL</label>
-                <input type="text" id="feedUrl" value="{{ config.news.get('feed_url', 'https://news.ycombinator.com/rss') }}" placeholder="https://example.com/rss">
+                <input type="text" id="feedUrl" value="{{ config.news.get('feed_url', 'https://feeds.bbci.co.uk/news/world/rss.xml') }}" placeholder="https://example.com/rss">
             </div>
 
             <button onclick="updateNewsSettings()">Save News Settings</button>
