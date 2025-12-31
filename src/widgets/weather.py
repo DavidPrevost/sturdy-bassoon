@@ -51,7 +51,9 @@ class WeatherWidget(Widget):
             self.set_location_from_zip(self.zip_code)
 
         self.units = config.get('weather.units', 'fahrenheit')
-        self.forecast_days = config.get('weather.show_forecast_days', 3)
+        # show_forecast_days is number of FUTURE days (excluding today)
+        # We request +1 to include today's hi/lo for left panel
+        self.forecast_days = config.get('weather.show_forecast_days', 4) + 1
 
         self.current_temp = None
         self.current_condition = None
@@ -203,25 +205,26 @@ class WeatherWidget(Widget):
         # Draw current weather (left side)
         current_x = x + left_width // 2
 
-        # City name (larger, at top of left pane)
+        # Location name (City, State) at top of left pane
         if self.location_name:
-            city = self.location_name.split(',')[0]  # Remove state if present
+            # Truncate if too long for display
+            loc_display = self.location_name[:18] if len(self.location_name) > 18 else self.location_name
             renderer.draw_text(
-                city,
+                loc_display,
                 current_x,
                 y + 8,
-                font_size=11,
+                font_size=10,
                 bold=True,
                 anchor="mm"
             )
 
-        # ZIP code below city name
+        # ZIP code below location name
         if self.zip_code:
             renderer.draw_text(
-                self.zip_code,
+                f"ZIP {self.zip_code}",
                 current_x,
-                y + 22,
-                font_size=9,
+                y + 20,
+                font_size=8,
                 anchor="mm"
             )
 
