@@ -40,13 +40,19 @@ class Geocoder:
                 lat = float(result['lat'])
                 lon = float(result['lon'])
 
-                # Extract city name from display_name
+                # Extract city and state from display_name
                 # Usually format: "City, County, State, ZIP, Country"
                 display_parts = result.get('display_name', '').split(',')
-                city = display_parts[0].strip() if display_parts else f"ZIP {zip_code}"
+                if len(display_parts) >= 3:
+                    city = display_parts[0].strip()
+                    # State is usually the 3rd part (after county)
+                    state = display_parts[2].strip() if len(display_parts) > 2 else ""
+                    location_name = f"{city}, {state}" if state else city
+                else:
+                    location_name = display_parts[0].strip() if display_parts else f"ZIP {zip_code}"
 
-                print(f"Geocoded {zip_code} -> {lat}, {lon} ({city})")
-                return lat, lon, city
+                print(f"Geocoded {zip_code} -> {lat}, {lon} ({location_name})")
+                return lat, lon, location_name
 
             print(f"No results for ZIP code: {zip_code}")
             return None

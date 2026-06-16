@@ -95,13 +95,15 @@ portfolio:
 
 news:
   max_headlines: 5
+  feed_url: "https://feeds.bbci.co.uk/news/world/rss.xml"
+  feed_name: "BBC World"
   feeds:
-    - url: "https://feeds.bbci.co.uk/news/technology/rss.xml"
-      name: "BBC Tech"
-    - url: "https://news.ycombinator.com/rss"
-      name: "Hacker News"
-    - url: "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
-      name: "NYT Business"
+    - url: "https://feeds.bbci.co.uk/news/world/rss.xml"
+      name: "BBC World"
+    - url: "https://feeds.npr.org/1001/rss.xml"
+      name: "NPR News"
+    - url: "https://www.theguardian.com/world/rss"
+      name: "The Guardian"
 
 network:
   show_bandwidth: true

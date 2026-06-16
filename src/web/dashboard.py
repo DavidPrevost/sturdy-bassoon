@@ -281,12 +281,26 @@ def update_settings():
             return jsonify({'error': 'Interval must be 1-60 minutes'}), 400
         config['refresh']['interval_minutes'] = interval
 
+    # Update clock update interval
+    if 'clock_update_seconds' in data:
+        seconds = int(data['clock_update_seconds'])
+        if seconds < 10 or seconds > 300:
+            return jsonify({'error': 'Clock update must be 10-300 seconds'}), 400
+        config['refresh']['clock_update_seconds'] = seconds
+
     # Update weather units
     if 'weather_units' in data:
         units = data['weather_units']
         if units not in ['fahrenheit', 'celsius']:
             return jsonify({'error': 'Invalid units'}), 400
         config['weather']['units'] = units
+
+    # Update weather forecast days
+    if 'weather_forecast_days' in data:
+        days = int(data['weather_forecast_days'])
+        if days < 1 or days > 7:
+            return jsonify({'error': 'Forecast days must be 1-7'}), 400
+        config['weather']['show_forecast_days'] = days
 
     # Update network settings
     if 'network_show_bandwidth' in data:
@@ -297,6 +311,110 @@ def update_settings():
 
     save_config(config)
     return jsonify({'success': True})
+
+
+@app.route('/api/news/settings', methods=['GET'])
+def get_news_settings():
+    """Get news widget settings."""
+    config = load_config()
+    news = config.get('news', {})
+    return jsonify({
+        'max_headlines': news.get('max_headlines', 5),
+        'feed_url': news.get('feed_url', 'https://news.ycombinator.com/rss'),
+        'feed_name': news.get('feed_name', 'Hacker News'),
+        'feeds': news.get('feeds', [])
+    })
+
+
+@app.route('/api/news/settings', methods=['POST'])
+def update_news_settings():
+    """Update news widget settings."""
+    data = request.json
+    config = load_config()
+
+    if 'news' not in config:
+        config['news'] = {}
+
+    # Update max headlines
+    if 'max_headlines' in data:
+        headlines = int(data['max_headlines'])
+        if headlines < 1 or headlines > 10:
+            return jsonify({'error': 'Headlines must be 1-10'}), 400
+        config['news']['max_headlines'] = headlines
+
+    # Update single feed (simple mode)
+    if 'feed_url' in data:
+        config['news']['feed_url'] = data['feed_url'].strip()
+    if 'feed_name' in data:
+        config['news']['feed_name'] = data['feed_name'].strip()
+
+    save_config(config)
+    return jsonify({'success': True})
+
+
+@app.route('/api/news/feeds', methods=['GET'])
+def get_news_feeds():
+    """Get list of RSS feeds."""
+    config = load_config()
+    feeds = config.get('news', {}).get('feeds', [])
+    # Also include the single feed if it exists
+    single_url = config.get('news', {}).get('feed_url')
+    single_name = config.get('news', {}).get('feed_name')
+    return jsonify({
+        'feeds': feeds,
+        'single_feed': {'url': single_url, 'name': single_name} if single_url else None
+    })
+
+
+@app.route('/api/news/feed', methods=['POST'])
+def add_news_feed():
+    """Add a new RSS feed."""
+    data = request.json
+    config = load_config()
+
+    if 'url' not in data or 'name' not in data:
+        return jsonify({'error': 'Missing url or name'}), 400
+
+    url = data['url'].strip()
+    name = data['name'].strip()
+
+    if not url or not name:
+        return jsonify({'error': 'URL and name are required'}), 400
+
+    if 'news' not in config:
+        config['news'] = {}
+    if 'feeds' not in config['news']:
+        config['news']['feeds'] = []
+
+    # Check for duplicate URL
+    for feed in config['news']['feeds']:
+        if feed.get('url') == url:
+            return jsonify({'error': 'Feed URL already exists'}), 400
+
+    config['news']['feeds'].append({'url': url, 'name': name})
+    save_config(config)
+
+    return jsonify({'success': True, 'feeds': config['news']['feeds']})
+
+
+@app.route('/api/news/feed', methods=['DELETE'])
+def remove_news_feed():
+    """Remove an RSS feed by URL."""
+    data = request.json
+    config = load_config()
+
+    if 'url' not in data:
+        return jsonify({'error': 'Missing url'}), 400
+
+    url = data['url'].strip()
+
+    if 'news' in config and 'feeds' in config['news']:
+        config['news']['feeds'] = [
+            f for f in config['news']['feeds'] if f.get('url') != url
+        ]
+        save_config(config)
+
+    return jsonify({'success': True, 'feeds': config['news'].get('feeds', [])})
 
 
 def main():

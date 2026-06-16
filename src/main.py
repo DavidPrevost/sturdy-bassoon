@@ -245,6 +245,52 @@ class Dashboard:
                             self.render_dashboard(partial=False)
                             return
 
+            # Handle news detail screen navigation
+            if current_screen.name == 'news_detail':
+                news_widget = self._find_news_widget()
+                if news_widget:
+                    # If showing article detail
+                    if news_widget.is_showing_article():
+                        if event.gesture == Gesture.SWIPE_RIGHT:
+                            # Go back to headline list
+                            news_widget.close_article()
+                            self.render_dashboard(partial=False)
+                            return
+                        elif event.gesture == Gesture.SWIPE_UP:
+                            # Scroll article down
+                            if news_widget.scroll_article_down():
+                                self.render_dashboard(partial=False)
+                                return
+                        elif event.gesture == Gesture.SWIPE_DOWN:
+                            # Scroll article up
+                            if news_widget.scroll_article_up():
+                                self.render_dashboard(partial=False)
+                                return
+                        elif event.gesture == Gesture.TAP:
+                            # Tap anywhere to go back
+                            news_widget.close_article()
+                            self.render_dashboard(partial=False)
+                            return
+                    else:
+                        # Showing headline list
+                        if event.gesture == Gesture.SWIPE_UP:
+                            # Next page
+                            if news_widget.next_page():
+                                self.render_dashboard(partial=False)
+                                return
+                        elif event.gesture == Gesture.SWIPE_DOWN:
+                            # Previous page
+                            if news_widget.prev_page():
+                                self.render_dashboard(partial=False)
+                                return
+                        elif event.gesture == Gesture.TAP and event.position:
+                            # Tap on headline to show article
+                            tap_idx = news_widget.get_tap_zone(event.position)
+                            if tap_idx is not None:
+                                if news_widget.select_article(tap_idx):
+                                    self.render_dashboard(partial=False)
+                                    return
+
             # Standard gesture handling (swipes, edge taps)
             if self.screen_manager.handle_gesture(event):
                 # Screen changed - use full refresh to avoid ghosting
@@ -316,6 +362,19 @@ class Dashboard:
         elif self.widgets:
             for widget in self.widgets:
                 if isinstance(widget, PortfolioWidget):
+                    return widget
+        return None
+
+    def _find_news_widget(self):
+        """Find the news widget in the current configuration."""
+        if self.multi_screen_mode and self.screen_manager:
+            for screen in self.screen_manager.screens:
+                for widget in screen.widgets:
+                    if isinstance(widget, NewsWidget):
+                        return widget
+        elif self.widgets:
+            for widget in self.widgets:
+                if isinstance(widget, NewsWidget):
                     return widget
         return None
 
@@ -420,6 +479,11 @@ class Dashboard:
                 if self.last_clock_update:
                     clock_elapsed = current_time - self.last_clock_update
                     if clock_elapsed >= self.clock_update_interval:
+                        # Rotate news headlines
+                        news_widget = self._find_news_widget()
+                        if news_widget:
+                            news_widget.rotate()
+
                         # Update clock display if on home screen with clock
                         if self._should_update_clock():
                             self.render_dashboard(partial=True)
