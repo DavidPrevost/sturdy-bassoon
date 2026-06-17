@@ -36,21 +36,21 @@ class ClockCompactWidget(Widget):
         center_x = x + width // 2
         center_y = y + height // 2
 
-        # Draw time (larger)
+        # Draw time (larger, utilizing more quadrant space)
         renderer.draw_text(
             time_str,
             center_x,
-            center_y - 8,
-            font_size=14,
+            center_y - 10,
+            font_size=18,
             bold=True,
             anchor="mm"
         )
 
-        # Draw date (smaller, below time)
+        # Draw date (below time)
         renderer.draw_text(
             date_str,
             center_x,
-            center_y + 12,
-            font_size=9,
+            center_y + 14,
+            font_size=10,
             anchor="mm"
         )

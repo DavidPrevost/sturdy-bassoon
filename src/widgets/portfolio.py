@@ -155,17 +155,19 @@ class PortfolioWidget(Widget):
             return None
 
     def scroll_up(self):
-        """Scroll up in the holdings list."""
+        """Scroll up by one page in the holdings list."""
         if self.scroll_offset > 0:
-            self.scroll_offset -= 1
+            # Move by full page (items_per_page)
+            self.scroll_offset = max(0, self.scroll_offset - self.items_per_page)
             return True
         return False
 
     def scroll_down(self):
-        """Scroll down in the holdings list."""
+        """Scroll down by one page in the holdings list."""
         max_offset = max(0, len(self.holdings) - self.items_per_page)
         if self.scroll_offset < max_offset:
-            self.scroll_offset += 1
+            # Move by full page (items_per_page)
+            self.scroll_offset = min(max_offset, self.scroll_offset + self.items_per_page)
             return True
         return False
 
@@ -258,9 +260,11 @@ class PortfolioWidget(Widget):
                     anchor="rt"
                 )
 
-        # Show scroll hints if more holdings exist
+        # Show scroll hints on left side (to avoid overlap with navigation arrows)
         if total_pages > 1:
+            # Position arrows on the left edge, vertically centered
+            arrow_x = x + 3
             if self.scroll_offset > 0:
-                renderer.draw_text("▲", x + width - 10, y + 3, font_size=8, anchor="rt")
+                renderer.draw_text("▲", arrow_x, y + height // 3, font_size=8, anchor="lt")
             if self.scroll_offset + self.items_per_page < len(self.holdings):
-                renderer.draw_text("▼", x + width - 10, y + height - 3, font_size=8, anchor="rb")
+                renderer.draw_text("▼", arrow_x, y + 2 * height // 3, font_size=8, anchor="lt")

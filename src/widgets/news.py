@@ -305,12 +305,12 @@ class NewsWidget(Widget):
         center_x = x + width // 2
         center_y = y + height // 2
 
-        # Title
+        # Title (closer to top edge)
         renderer.draw_text(
             "News",
             center_x,
-            y + 8,
-            font_size=8,
+            y + 5,
+            font_size=9,
             bold=True,
             anchor="mt"
         )
@@ -320,13 +320,13 @@ class NewsWidget(Widget):
             idx = self.rotation_index % len(self.headlines)
             title, description, source = self.headlines[idx]
 
-            # Truncate title to fit quadrant (roughly 20 chars per line)
-            max_chars = 40
+            # Truncate title to fit quadrant (roughly 18 chars per line with larger font)
+            max_chars = 36
             if len(title) > max_chars:
                 title = title[:max_chars-3] + "..."
 
             # Split into 2 lines if needed
-            if len(title) > 20:
+            if len(title) > 18:
                 mid = len(title) // 2
                 # Find nearest space
                 space_idx = title.rfind(' ', 0, mid + 5)
@@ -334,21 +334,21 @@ class NewsWidget(Widget):
                     line1 = title[:space_idx]
                     line2 = title[space_idx+1:]
                 else:
-                    line1 = title[:20]
-                    line2 = title[20:]
+                    line1 = title[:18]
+                    line2 = title[18:]
 
                 renderer.draw_text(
                     line1,
                     center_x,
                     center_y - 4,
-                    font_size=7,
+                    font_size=8,
                     anchor="mm"
                 )
                 renderer.draw_text(
                     line2,
                     center_x,
                     center_y + 8,
-                    font_size=7,
+                    font_size=8,
                     anchor="mm"
                 )
             else:
@@ -356,16 +356,17 @@ class NewsWidget(Widget):
                     title,
                     center_x,
                     center_y + 2,
-                    font_size=7,
+                    font_size=8,
                     anchor="mm"
                 )
 
-            # Source
+            # Source (closer to bottom edge)
             renderer.draw_text(
                 source,
                 center_x,
-                y + height - 8,
-                font_size=6,
+                y + height - 5,
+                font_size=7,
+                bold=True,
                 anchor="mb"
             )
         else:
@@ -373,7 +374,7 @@ class NewsWidget(Widget):
                 "No news",
                 center_x,
                 center_y,
-                font_size=8,
+                font_size=10,
                 anchor="mm"
             )
 

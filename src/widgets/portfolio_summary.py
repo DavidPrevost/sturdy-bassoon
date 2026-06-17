@@ -164,17 +164,17 @@ class PortfolioSummaryWidget(Widget):
         center_x = x + width // 2
         center_y = y + height // 2
 
-        # Title
+        # Title (closer to top edge)
         renderer.draw_text(
             "Portfolio",
             center_x,
-            y + 8,
-            font_size=8,
+            y + 5,
+            font_size=9,
             bold=True,
             anchor="mt"
         )
 
-        # Total value
+        # Total value (larger)
         if self.total_value >= 1000:
             value_str = f"${self.total_value:,.0f}"
         else:
@@ -183,22 +183,22 @@ class PortfolioSummaryWidget(Widget):
         renderer.draw_text(
             value_str,
             center_x,
-            center_y - 2,
-            font_size=12,
+            center_y - 4,
+            font_size=14,
             bold=True,
             anchor="mm"
         )
 
-        # Daily change
+        # Daily change (larger font for legibility)
         if self.daily_change >= 0:
-            change_str = f"+${self.daily_change:.2f} ({self.daily_change_pct:+.1f}%)"
+            change_str = f"+${self.daily_change:.0f} ({self.daily_change_pct:+.1f}%)"
         else:
-            change_str = f"-${abs(self.daily_change):.2f} ({self.daily_change_pct:+.1f}%)"
+            change_str = f"-${abs(self.daily_change):.0f} ({self.daily_change_pct:+.1f}%)"
 
         renderer.draw_text(
             change_str,
             center_x,
-            center_y + 14,
-            font_size=7,
+            center_y + 16,
+            font_size=10,
             anchor="mm"
         )
